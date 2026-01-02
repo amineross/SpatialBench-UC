@@ -1,0 +1,466 @@
+{
+  "_metadata": {
+    "source": "torchvision.models.detection.FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT",
+    "description": "Official COCO class names from torchvision pretrained weights",
+    "generated_by": "scripts/generate_coco_vocab.py",
+    "total_classes": 91,
+    "note": "This file is auto-generated. Do not edit manually."
+  },
+  "classes": [
+    {
+      "id": 0,
+      "name": "__background__",
+      "is_background": true
+    },
+    {
+      "id": 1,
+      "name": "person",
+      "is_background": false
+    },
+    {
+      "id": 2,
+      "name": "bicycle",
+      "is_background": false
+    },
+    {
+      "id": 3,
+      "name": "car",
+      "is_background": false
+    },
+    {
+      "id": 4,
+      "name": "motorcycle",
+      "is_background": false
+    },
+    {
+      "id": 5,
+      "name": "airplane",
+      "is_background": false
+    },
+    {
+      "id": 6,
+      "name": "bus",
+      "is_background": false
+    },
+    {
+      "id": 7,
+      "name": "train",
+      "is_background": false
+    },
+    {
+      "id": 8,
+      "name": "truck",
+      "is_background": false
+    },
+    {
+      "id": 9,
+      "name": "boat",
+      "is_background": false
+    },
+    {
+      "id": 10,
+      "name": "traffic light",
+      "is_background": false
+    },
+    {
+      "id": 11,
+      "name": "fire hydrant",
+      "is_background": false
+    },
+    {
+      "id": 12,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 13,
+      "name": "stop sign",
+      "is_background": false
+    },
+    {
+      "id": 14,
+      "name": "parking meter",
+      "is_background": false
+    },
+    {
+      "id": 15,
+      "name": "bench",
+      "is_background": false
+    },
+    {
+      "id": 16,
+      "name": "bird",
+      "is_background": false
+    },
+    {
+      "id": 17,
+      "name": "cat",
+      "is_background": false
+    },
+    {
+      "id": 18,
+      "name": "dog",
+      "is_background": false
+    },
+    {
+      "id": 19,
+      "name": "horse",
+      "is_background": false
+    },
+    {
+      "id": 20,
+      "name": "sheep",
+      "is_background": false
+    },
+    {
+      "id": 21,
+      "name": "cow",
+      "is_background": false
+    },
+    {
+      "id": 22,
+      "name": "elephant",
+      "is_background": false
+    },
+    {
+      "id": 23,
+      "name": "bear",
+      "is_background": false
+    },
+    {
+      "id": 24,
+      "name": "zebra",
+      "is_background": false
+    },
+    {
+      "id": 25,
+      "name": "giraffe",
+      "is_background": false
+    },
+    {
+      "id": 26,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 27,
+      "name": "backpack",
+      "is_background": false
+    },
+    {
+      "id": 28,
+      "name": "umbrella",
+      "is_background": false
+    },
+    {
+      "id": 29,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 30,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 31,
+      "name": "handbag",
+      "is_background": false
+    },
+    {
+      "id": 32,
+      "name": "tie",
+      "is_background": false
+    },
+    {
+      "id": 33,
+      "name": "suitcase",
+      "is_background": false
+    },
+    {
+      "id": 34,
+      "name": "frisbee",
+      "is_background": false
+    },
+    {
+      "id": 35,
+      "name": "skis",
+      "is_background": false
+    },
+    {
+      "id": 36,
+      "name": "snowboard",
+      "is_background": false
+    },
+    {
+      "id": 37,
+      "name": "sports ball",
+      "is_background": false
+    },
+    {
+      "id": 38,
+      "name": "kite",
+      "is_background": false
+    },
+    {
+      "id": 39,
+      "name": "baseball bat",
+      "is_background": false
+    },
+    {
+      "id": 40,
+      "name": "baseball glove",
+      "is_background": false
+    },
+    {
+      "id": 41,
+      "name": "skateboard",
+      "is_background": false
+    },
+    {
+      "id": 42,
+      "name": "surfboard",
+      "is_background": false
+    },
+    {
+      "id": 43,
+      "name": "tennis racket",
+      "is_background": false
+    },
+    {
+      "id": 44,
+      "name": "bottle",
+      "is_background": false
+    },
+    {
+      "id": 45,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 46,
+      "name": "wine glass",
+      "is_background": false
+    },
+    {
+      "id": 47,
+      "name": "cup",
+      "is_background": false
+    },
+    {
+      "id": 48,
+      "name": "fork",
+      "is_background": false
+    },
+    {
+      "id": 49,
+      "name": "knife",
+      "is_background": false
+    },
+    {
+      "id": 50,
+      "name": "spoon",
+      "is_background": false
+    },
+    {
+      "id": 51,
+      "name": "bowl",
+      "is_background": false
+    },
+    {
+      "id": 52,
+      "name": "banana",
+      "is_background": false
+    },
+    {
+      "id": 53,
+      "name": "apple",
+      "is_background": false
+    },
+    {
+      "id": 54,
+      "name": "sandwich",
+      "is_background": false
+    },
+    {
+      "id": 55,
+      "name": "orange",
+      "is_background": false
+    },
+    {
+      "id": 56,
+      "name": "broccoli",
+      "is_background": false
+    },
+    {
+      "id": 57,
+      "name": "carrot",
+      "is_background": false
+    },
+    {
+      "id": 58,
+      "name": "hot dog",
+      "is_background": false
+    },
+    {
+      "id": 59,
+      "name": "pizza",
+      "is_background": false
+    },
+    {
+      "id": 60,
+      "name": "donut",
+      "is_background": false
+    },
+    {
+      "id": 61,
+      "name": "cake",
+      "is_background": false
+    },
+    {
+      "id": 62,
+      "name": "chair",
+      "is_background": false
+    },
+    {
+      "id": 63,
+      "name": "couch",
+      "is_background": false
+    },
+    {
+      "id": 64,
+      "name": "potted plant",
+      "is_background": false
+    },
+    {
+      "id": 65,
+      "name": "bed",
+      "is_background": false
+    },
+    {
+      "id": 66,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 67,
+      "name": "dining table",
+      "is_background": false
+    },
+    {
+      "id": 68,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 69,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 70,
+      "name": "toilet",
+      "is_background": false
+    },
+    {
+      "id": 71,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 72,
+      "name": "tv",
+      "is_background": false
+    },
+    {
+      "id": 73,
+      "name": "laptop",
+      "is_background": false
+    },
+    {
+      "id": 74,
+      "name": "mouse",
+      "is_background": false
+    },
+    {
+      "id": 75,
+      "name": "remote",
+      "is_background": false
+    },
+    {
+      "id": 76,
+      "name": "keyboard",
+      "is_background": false
+    },
+    {
+      "id": 77,
+      "name": "cell phone",
+      "is_background": false
+    },
+    {
+      "id": 78,
+      "name": "microwave",
+      "is_background": false
+    },
+    {
+      "id": 79,
+      "name": "oven",
+      "is_background": false
+    },
+    {
+      "id": 80,
+      "name": "toaster",
+      "is_background": false
+    },
+    {
+      "id": 81,
+      "name": "sink",
+      "is_background": false
+    },
+    {
+      "id": 82,
+      "name": "refrigerator",
+      "is_background": false
+    },
+    {
+      "id": 83,
+      "name": "N/A",
+      "is_background": false
+    },
+    {
+      "id": 84,
+      "name": "book",
+      "is_background": false
+    },
+    {
+      "id": 85,
+      "name": "clock",
+      "is_background": false
+    },
+    {
+      "id": 86,
+      "name": "vase",
+      "is_background": false
+    },
+    {
+      "id": 87,
+      "name": "scissors",
+      "is_background": false
+    },
+    {
+      "id": 88,
+      "name": "teddy bear",
+      "is_background": false
+    },
+    {
+      "id": 89,
+      "name": "hair drier",
+      "is_background": false
+    },
+    {
+      "id": 90,
+      "name": "toothbrush",
+      "is_background": false
+    }
+  ]
+}

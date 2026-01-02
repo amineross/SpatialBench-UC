@@ -1,0 +1,59 @@
+# =============================================================================
+# SD 1.5 Prompt-Only Generation Configuration
+# =============================================================================
+# Baseline 1: Standard text-to-image generation without guidance.
+# Research question: Can text prompts alone convey spatial relations?
+#
+# Usage:
+#   python -m spatialbench_uc.generate \
+#     --config configs/gen_sd15_promptonly.yaml \
+#     --prompts data/prompts/v1.0.0/prompts.jsonl \
+#     --out runs/<run_id>
+
+# Generator configuration
+generator:
+  # Registry type (see generators/registry.py)
+  type: diffusers
+  
+  # Model identifier (HuggingFace model ID)
+  model_id: "stable-diffusion-v1-5/stable-diffusion-v1-5"
+  
+  # Generation mode
+  mode: prompt_only
+  
+  # Generation parameters
+  params:
+    # Image dimensions (SD 1.5 native resolution)
+    height: 512
+    width: 512
+    
+    # Diffusion parameters
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    
+    # Scheduler (UniPC is fast and high quality)
+    scheduler: "UniPCMultistepScheduler"
+    
+    # No negative prompt for baseline
+    negative_prompt: null
+
+# Seeds for reproducibility (K=4 images per prompt)
+seeds: [0, 1, 2, 3]
+
+# Device configuration (auto = CUDA > MPS > CPU)
+device: auto
+
+# Output configuration
+output:
+  # Image format
+  format: png
+  
+  # Save generation config with each run
+  save_config: true
+  
+  # Log library versions for reproducibility
+  log_versions: true
+
+# Resume from interrupted run
+resume: true
+

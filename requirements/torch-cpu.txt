@@ -1,0 +1,13 @@
+# PyTorch CPU-only (any platform)
+#
+# Usage:
+#   pip install -r requirements/torch-cpu.txt
+#
+# Note: This is the slowest option but works on any system.
+#       Use for testing or when no GPU is available.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch>=2.1
+torchvision>=0.16
+

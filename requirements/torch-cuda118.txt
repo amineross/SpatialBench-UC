@@ -1,0 +1,13 @@
+# PyTorch for Linux/Windows with NVIDIA GPU (CUDA 11.8)
+#
+# Usage:
+#   pip install -r requirements/torch-cuda118.txt
+#
+# Note: Requires NVIDIA GPU with CUDA 11.8 drivers installed
+#       Use this for older GPU drivers or compatibility
+
+--extra-index-url https://download.pytorch.org/whl/cu118
+
+torch>=2.1
+torchvision>=0.16
+

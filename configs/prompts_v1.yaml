@@ -1,0 +1,57 @@
+# =============================================================================
+# Prompt Generation Configuration v1
+# =============================================================================
+# This config controls the generation of benchmark prompts with counterfactual pairs.
+#
+# Usage:
+#   python -m spatialbench_uc.build_prompts --config configs/prompts_v1.yaml
+
+version: "v1.0.0"
+
+# Dataset metadata
+dataset:
+  name: "SpatialBench-UC Prompts"
+  description: "Spatial relationship benchmark with counterfactual pairs"
+  language: "en"
+
+# Object vocabulary source
+objects_file: "data/objects/coco_subset_v1.json"
+
+# Prompt generation parameters
+generation:
+  # Number of unique object pairs to generate
+  num_pairs: 50
+  
+  # Spatial relations to test (each generates a counterfactual pair)
+  relations:
+    - left_of    # Counterfactual: right_of
+    - above      # Counterfactual: below
+  
+  # Random seed for reproducible pair sampling
+  seed: 1234
+  
+  # Template for generating prompts
+  templates:
+    left_of: "A photo of a {A} to the left of a {B}."
+    right_of: "A photo of a {B} to the right of a {A}."
+    above: "A photo of a {A} above a {B}."
+    below: "A photo of a {B} below a {A}."
+
+# Output configuration
+output:
+  directory: "data/prompts/v1.0.0"
+  prompts_file: "prompts.jsonl"
+  meta_file: "dataset_meta.json"
+  hash_file: "sha256.txt"
+
+# Validation rules
+validation:
+  # Ensure no object paired with itself
+  no_self_pairs: true
+  
+  # Ensure balanced distribution across relations
+  check_balance: true
+  
+  # Ensure counterfactual pairs are properly linked
+  verify_counterfactuals: true
+

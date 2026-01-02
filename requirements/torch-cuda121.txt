@@ -1,0 +1,12 @@
+# PyTorch for Linux/Windows with NVIDIA GPU (CUDA 12.1)
+#
+# Usage:
+#   pip install -r requirements/torch-cuda121.txt
+#
+# Note: Requires NVIDIA GPU with CUDA 12.1 drivers installed
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+torch>=2.1
+torchvision>=0.16
+

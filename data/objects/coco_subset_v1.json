@@ -1,0 +1,228 @@
+{
+  "_metadata": {
+    "version": "v1.0.0",
+    "description": "Curated subset of COCO classes for spatial benchmark prompts",
+    "source": "data/objects/coco_classes.json",
+    "selection_criteria": [
+      "Well-detectable by Faster R-CNN and GroundingDINO",
+      "Commonly generated well by Stable Diffusion",
+      "Reasonable size (not too small like toothbrush)",
+      "Unambiguous (avoiding tie, mouse which could be animal/device)",
+      "Includes multi-word objects to test robustness"
+    ],
+    "total_objects": 35
+  },
+  "objects": [
+    {
+      "name": "cat",
+      "coco_id": 17,
+      "category": "animal",
+      "notes": "Common, well-detected"
+    },
+    {
+      "name": "dog",
+      "coco_id": 18,
+      "category": "animal",
+      "notes": "Common, well-detected"
+    },
+    {
+      "name": "horse",
+      "coco_id": 19,
+      "category": "animal",
+      "notes": "Large, distinctive"
+    },
+    {
+      "name": "cow",
+      "coco_id": 21,
+      "category": "animal",
+      "notes": "Large, distinctive"
+    },
+    {
+      "name": "elephant",
+      "coco_id": 22,
+      "category": "animal",
+      "notes": "Very large, unmistakable"
+    },
+    {
+      "name": "bear",
+      "coco_id": 23,
+      "category": "animal",
+      "notes": "Large, distinctive"
+    },
+    {
+      "name": "zebra",
+      "coco_id": 24,
+      "category": "animal",
+      "notes": "Distinctive stripes"
+    },
+    {
+      "name": "giraffe",
+      "coco_id": 25,
+      "category": "animal",
+      "notes": "Very tall, distinctive"
+    },
+    {
+      "name": "bird",
+      "coco_id": 16,
+      "category": "animal",
+      "notes": "Common, but can be small"
+    },
+    {
+      "name": "car",
+      "coco_id": 3,
+      "category": "vehicle",
+      "notes": "Common, well-detected"
+    },
+    {
+      "name": "bicycle",
+      "coco_id": 2,
+      "category": "vehicle",
+      "notes": "Distinctive shape"
+    },
+    {
+      "name": "motorcycle",
+      "coco_id": 4,
+      "category": "vehicle",
+      "notes": "Distinctive shape"
+    },
+    {
+      "name": "bus",
+      "coco_id": 6,
+      "category": "vehicle",
+      "notes": "Large, distinctive"
+    },
+    {
+      "name": "truck",
+      "coco_id": 8,
+      "category": "vehicle",
+      "notes": "Large"
+    },
+    {
+      "name": "airplane",
+      "coco_id": 5,
+      "category": "vehicle",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "boat",
+      "coco_id": 9,
+      "category": "vehicle",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "chair",
+      "coco_id": 62,
+      "category": "furniture",
+      "notes": "Common, well-detected"
+    },
+    {
+      "name": "couch",
+      "coco_id": 63,
+      "category": "furniture",
+      "notes": "Large, distinctive"
+    },
+    {
+      "name": "bed",
+      "coco_id": 65,
+      "category": "furniture",
+      "notes": "Large"
+    },
+    {
+      "name": "dining table",
+      "coco_id": 67,
+      "category": "furniture",
+      "notes": "Multi-word, large"
+    },
+    {
+      "name": "tv",
+      "coco_id": 72,
+      "category": "electronics",
+      "notes": "Distinctive shape"
+    },
+    {
+      "name": "laptop",
+      "coco_id": 73,
+      "category": "electronics",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "bottle",
+      "coco_id": 44,
+      "category": "kitchen",
+      "notes": "Common object"
+    },
+    {
+      "name": "cup",
+      "coco_id": 47,
+      "category": "kitchen",
+      "notes": "Common object"
+    },
+    {
+      "name": "bowl",
+      "coco_id": 51,
+      "category": "kitchen",
+      "notes": "Common object"
+    },
+    {
+      "name": "pizza",
+      "coco_id": 59,
+      "category": "food",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "cake",
+      "coco_id": 61,
+      "category": "food",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "banana",
+      "coco_id": 52,
+      "category": "food",
+      "notes": "Distinctive color/shape"
+    },
+    {
+      "name": "apple",
+      "coco_id": 53,
+      "category": "food",
+      "notes": "Common fruit"
+    },
+    {
+      "name": "teddy bear",
+      "coco_id": 88,
+      "category": "indoor",
+      "notes": "Multi-word, distinctive"
+    },
+    {
+      "name": "clock",
+      "coco_id": 85,
+      "category": "indoor",
+      "notes": "Distinctive shape"
+    },
+    {
+      "name": "vase",
+      "coco_id": 86,
+      "category": "indoor",
+      "notes": "Distinctive"
+    },
+    {
+      "name": "potted plant",
+      "coco_id": 64,
+      "category": "indoor",
+      "notes": "Multi-word"
+    },
+    {
+      "name": "fire hydrant",
+      "coco_id": 11,
+      "category": "outdoor",
+      "notes": "Multi-word, distinctive color"
+    },
+    {
+      "name": "stop sign",
+      "coco_id": 13,
+      "category": "outdoor",
+      "notes": "Multi-word, distinctive"
+    }
+  ]
+}
+

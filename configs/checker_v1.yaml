@@ -1,0 +1,104 @@
+# =============================================================================
+# Checker (Evaluator) Configuration v1
+# =============================================================================
+# Configuration for spatial relationship evaluation with uncertainty quantification.
+#
+# Usage:
+#   python -m spatialbench_uc.evaluate \
+#     --manifest runs/<run_id>/manifest.jsonl \
+#     --config configs/checker_v1.yaml \
+#     --out runs/<run_id>/eval
+
+# Detector configuration
+detector:
+  # Primary detector (COCO closed-vocab)
+  primary:
+    type: fasterrcnn
+    params:
+      score_threshold: 0.5
+  
+  # Secondary detector for agreement (open-vocab)
+  secondary:
+    type: grounding_dino
+    model_id: "IDEA-Research/grounding-dino-base"
+    params:
+      box_threshold: 0.35
+      text_threshold: 0.25
+
+# Verdict thresholds
+thresholds:
+  # Minimum detection score to consider object "detected"
+  detection_score: 0.3
+  
+  # Minimum box area (fraction of image) to avoid noise
+  min_area_fraction: 0.005  # 0.5% of image
+  
+  # Maximum IoU between A and B for left/right relations
+  # (high overlap makes spatial judgment unreliable)
+  max_overlap_iou: 0.5
+  
+  # Ambiguity threshold: if two detections have scores within this delta,
+  # consider it ambiguous multi-instance
+  ambiguity_delta: 0.1
+
+# Geometric rules
+geometry:
+  # Margin for UNDECIDABLE zone (fraction of image dimension)
+  # If |delta| <= margin, verdict is UNDECIDABLE
+  margin: 0.05  # 5% of width/height
+  
+  # Use center-to-center distance (vs edge-to-edge)
+  use_centers: true
+
+# Stability testing (perturbation robustness)
+stability:
+  enabled: true
+  
+  # Perturbations to apply
+  perturbations:
+    - type: brightness
+      factor: 1.1
+    - type: brightness
+      factor: 0.9
+    - type: gaussian_blur
+      sigma: 1.0
+    - type: resize
+      scale: 0.9
+  
+  # Stability threshold: fraction of perturbations with consistent verdict
+  # Below this, consider UNDECIDABLE
+  consistency_threshold: 0.5
+
+# Confidence score weights
+confidence:
+  # Conf = det^w_det * geom^w_geom * stab^w_stab * agree^w_agree
+  weights:
+    detection: 0.4
+    geometry: 0.3
+    stability: 0.2
+    agreement: 0.1
+  
+  # Geometry confidence slope (see formula in docs)
+  geom_slope: 0.15
+
+# Output configuration
+output:
+  # Per-sample results file
+  results_file: "per_sample.jsonl"
+  
+  # Aggregated metrics file
+  metrics_file: "metrics.json"
+  
+  # Overlay images directory
+  overlays_dir: "overlays"
+  
+  # Generate overlay images for debugging
+  generate_overlays: true
+  
+  # Overlay style
+  overlay_style:
+    box_a_color: [255, 0, 0]     # Red
+    box_b_color: [0, 0, 255]     # Blue
+    text_color: [255, 255, 255]  # White
+    font_size: 16
+

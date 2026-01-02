@@ -1,0 +1,176 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spatialbench-uc"
+version = "0.1.0"
+description = "Uncertainty-aware spatial relationship benchmark for text-to-image models"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "SpatialBench-UC Contributors"}
+]
+keywords = [
+    "benchmark",
+    "text-to-image",
+    "spatial-reasoning",
+    "evaluation",
+    "uncertainty",
+    "diffusion-models",
+    "stable-diffusion",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+
+# =============================================================================
+# CORE DEPENDENCIES
+# Note: PyTorch is NOT included here - install via requirements/torch-*.txt
+# =============================================================================
+dependencies = [
+    # Data & Configuration
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+    
+    # Image Processing
+    "pillow>=9.0",
+    "opencv-python>=4.8",
+    
+    # ML Frameworks (PyTorch installed separately for platform compatibility)
+    "transformers>=4.36",
+    "diffusers>=0.25",
+    "accelerate>=0.25",
+    "safetensors>=0.4",
+    
+    # Note: torchvision is installed with PyTorch via requirements/torch-*.txt
+    
+    # Visualization & Reporting
+    "matplotlib>=3.7",
+    "jinja2>=3.0",
+    "tqdm>=4.65",
+]
+
+# =============================================================================
+# OPTIONAL DEPENDENCIES
+# =============================================================================
+[project.optional-dependencies]
+# Development tools
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+]
+
+# Documentation
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.0",
+]
+
+# All optional dependencies
+all = [
+    "spatialbench-uc[dev,docs]",
+]
+
+# =============================================================================
+# PROJECT URLS
+# =============================================================================
+[project.urls]
+Homepage = "https://github.com/yourusername/spatialbench-uc"
+Documentation = "https://github.com/yourusername/spatialbench-uc#readme"
+Repository = "https://github.com/yourusername/spatialbench-uc"
+Issues = "https://github.com/yourusername/spatialbench-uc/issues"
+
+# =============================================================================
+# CLI ENTRY POINTS
+# =============================================================================
+[project.scripts]
+# Main CLI commands
+spatialbench-build-prompts = "spatialbench_uc.build_prompts:main"
+spatialbench-generate = "spatialbench_uc.generate:main"
+spatialbench-evaluate = "spatialbench_uc.evaluate:main"
+spatialbench-report = "spatialbench_uc.report:main"
+
+# Audit commands
+spatialbench-audit-sample = "spatialbench_uc.audit.sample:main"
+spatialbench-audit-analyze = "spatialbench_uc.audit.analyze:main"
+
+# =============================================================================
+# BUILD CONFIGURATION
+# =============================================================================
+[tool.hatch.build.targets.wheel]
+packages = ["src/spatialbench_uc"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/configs",
+    "/data",
+    "/requirements",
+]
+
+# =============================================================================
+# TOOL CONFIGURATIONS
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Function call in default argument (needed for FastAPI)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["spatialbench_uc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/spatialbench_uc"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+

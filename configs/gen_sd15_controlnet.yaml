@@ -1,0 +1,113 @@
+# =============================================================================
+# SD 1.5 + ControlNet Canny Generation Configuration
+# =============================================================================
+# Baseline 2: ControlNet-guided generation with synthetic edge maps.
+# Research question: Does structural guidance improve spatial accuracy?
+#
+# Usage:
+#   python -m spatialbench_uc.generate \
+#     --config configs/gen_sd15_controlnet.yaml \
+#     --prompts data/prompts/v1.0.0/prompts.jsonl \
+#     --out runs/<run_id>
+
+# Generator configuration
+generator:
+  # Registry type (see generators/registry.py)
+  type: diffusers
+  
+  # Model identifier (HuggingFace model ID)
+  model_id: "stable-diffusion-v1-5/stable-diffusion-v1-5"
+  
+  # Generation mode
+  mode: controlnet
+  
+  # ControlNet model (Canny edge detection)
+  controlnet_id: "lllyasviel/sd-controlnet-canny"
+  
+  # Generation parameters
+  params:
+    # Image dimensions (must match control image)
+    height: 512
+    width: 512
+    
+    # Diffusion parameters
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    
+    # ControlNet conditioning strength
+    # Higher = more faithful to edge map
+    # Lower = more creative freedom
+    controlnet_conditioning_scale: 1.0
+    
+    # Scheduler
+    scheduler: "UniPCMultistepScheduler"
+    
+    # No negative prompt for baseline
+    negative_prompt: null
+
+# Control image generation parameters
+control_image:
+  # Method for generating control images
+  method: "synthetic_edges"
+  
+  # Box placement for spatial relations
+  placement:
+    left_of:
+      box_a:
+        x_range: [0.05, 0.35]   # Left third
+        y_range: [0.25, 0.75]   # Vertical center
+      box_b:
+        x_range: [0.65, 0.95]   # Right third
+        y_range: [0.25, 0.75]
+    
+    above:
+      box_a:
+        x_range: [0.25, 0.75]   # Horizontal center
+        y_range: [0.05, 0.35]   # Top third
+      box_b:
+        x_range: [0.25, 0.75]
+        y_range: [0.65, 0.95]   # Bottom third
+    
+    right_of:
+      # Same as left_of but swapped
+      box_a:
+        x_range: [0.65, 0.95]
+        y_range: [0.25, 0.75]
+      box_b:
+        x_range: [0.05, 0.35]
+        y_range: [0.25, 0.75]
+    
+    below:
+      # Same as above but swapped
+      box_a:
+        x_range: [0.25, 0.75]
+        y_range: [0.65, 0.95]
+      box_b:
+        x_range: [0.25, 0.75]
+        y_range: [0.05, 0.35]
+  
+  # Box rendering
+  box_style:
+    outline_color: "white"
+    outline_width: 2
+    fill: null  # No fill, just outline
+
+# Seeds for reproducibility (K=4 images per prompt)
+# IMPORTANT: Use same seeds as prompt-only for fair comparison
+seeds: [0, 1, 2, 3]
+
+# Device configuration
+device: auto
+
+# Output configuration
+output:
+  format: png
+  save_config: true
+  log_versions: true
+  
+  # Also save control images for debugging
+  save_control_images: true
+
+# Resume from interrupted run
+resume: true
+

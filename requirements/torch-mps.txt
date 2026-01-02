@@ -1,0 +1,13 @@
+# PyTorch for Apple Silicon Macs (M1/M2/M3)
+# MPS (Metal Performance Shaders) backend for GPU acceleration
+#
+# Usage:
+#   pip install -r requirements/torch-mps.txt
+#
+# Note: MPS support requires macOS 12.3+ and Apple Silicon
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch>=2.1
+torchvision>=0.16
+
