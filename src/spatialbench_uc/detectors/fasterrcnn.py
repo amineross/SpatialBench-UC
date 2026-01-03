@@ -16,10 +16,17 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+import torch
 from PIL import Image
+from torchvision.models.detection import (
+    fasterrcnn_resnet50_fpn_v2,
+    FasterRCNN_ResNet50_FPN_V2_Weights,
+)
+from torchvision.transforms import functional as F
 
 from spatialbench_uc.detectors.base import BaseDetector, Detection, DetectorConfig
 from spatialbench_uc.detectors.registry import register_detector
+from spatialbench_uc.utils.device import get_device
 
 
 def _get_project_root() -> Path:
@@ -122,21 +129,33 @@ class FasterRCNNDetector(BaseDetector):
 
         Args:
             config: Detector configuration with optional params.
-
-        Note:
-            This is a stub implementation. Full implementation in Phase 4.
         """
         self.config = config
         self.params = config.params or {}
         self.score_threshold = self.params.get("score_threshold", 0.5)
 
         # Model will be loaded lazily or in warmup()
-        self.model = None
-        self.device = None
+        self._model = None
+        self._device = None
         
         # Load class mappings
         self._id_to_name = get_coco_id_to_name()
         self._name_to_id = get_coco_name_to_id()
+
+    def _load_model(self) -> None:
+        """Load the Faster R-CNN model if not already loaded."""
+        if self._model is not None:
+            return
+            
+        # Get device from config or auto-detect
+        device_pref = self.params.get("device", "auto")
+        self._device = get_device(device_pref)
+        
+        # Load model with pretrained weights
+        weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+        self._model = fasterrcnn_resnet50_fpn_v2(weights=weights)
+        self._model.to(self._device)
+        self._model.eval()
 
     def detect(self, image: Image.Image, labels: list[str]) -> list[Detection]:
         """
@@ -148,23 +167,70 @@ class FasterRCNNDetector(BaseDetector):
 
         Returns:
             List of Detection objects for matching instances.
-
-        Note:
-            This is a stub implementation. Full implementation in Phase 4.
         """
-        raise NotImplementedError(
-            "FasterRCNNDetector.detect() is a stub. "
-            "Full implementation will be added in Phase 4."
-        )
+        self._load_model()
+        
+        # Convert labels to lowercase and get their COCO IDs
+        target_labels = {label.lower() for label in labels}
+        target_ids = {
+            self._name_to_id[label] 
+            for label in target_labels 
+            if label in self._name_to_id
+        }
+        
+        if not target_ids:
+            # No valid COCO labels requested
+            return []
+        
+        # Convert image to tensor
+        # Ensure RGB mode
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        
+        img_tensor = F.to_tensor(image).to(self._device)
+        
+        # Run inference
+        with torch.no_grad():
+            outputs = self._model([img_tensor])[0]
+        
+        # Filter and convert results
+        detections = []
+        boxes = outputs["boxes"].cpu()
+        scores = outputs["scores"].cpu()
+        labels_out = outputs["labels"].cpu()
+        
+        for box, score, label_id in zip(boxes, scores, labels_out):
+            label_id = int(label_id)
+            score_val = float(score)
+            
+            # Filter by requested labels and score threshold
+            if label_id not in target_ids:
+                continue
+            if score_val < self.score_threshold:
+                continue
+                
+            # Get label name
+            label_name = self._id_to_name.get(label_id, "unknown")
+            
+            detections.append(Detection(
+                box_xyxy=tuple(float(x) for x in box.tolist()),
+                score=score_val,
+                label=label_name,
+            ))
+        
+        return detections
 
     def warmup(self) -> None:
-        """
-        Preload the Faster R-CNN model.
+        """Preload the Faster R-CNN model."""
+        self._load_model()
 
-        Note:
-            This is a stub implementation. Full implementation in Phase 4.
-        """
-        pass
+    def cleanup(self) -> None:
+        """Release model resources."""
+        if self._model is not None:
+            del self._model
+            self._model = None
+            if self._device and self._device.type == "cuda":
+                torch.cuda.empty_cache()
 
     @staticmethod
     def get_coco_classes() -> list[str]:

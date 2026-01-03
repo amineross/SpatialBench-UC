@@ -12,18 +12,23 @@
 # Detector configuration
 detector:
   # Primary detector (COCO closed-vocab)
+  # NOTE: Faster R-CNN runs ~25x faster on CPU than MPS on Apple Silicon
+  # due to MPS internal errors with detection model operations
   primary:
     type: fasterrcnn
     params:
       score_threshold: 0.5
+      device: cpu  # Force CPU - MPS is broken for Faster R-CNN
   
   # Secondary detector for agreement (open-vocab)
+  # NOTE: GroundingDINO (transformer-based) runs 3x faster on MPS than CPU
   secondary:
     type: grounding_dino
     model_id: "IDEA-Research/grounding-dino-base"
     params:
       box_threshold: 0.35
       text_threshold: 0.25
+      device: auto  # MPS is optimal for transformer models
 
 # Verdict thresholds
 thresholds:
