@@ -8,6 +8,9 @@ Supported modes:
 - prompt_only: Standard text-to-image generation
 - controlnet: ControlNet-guided generation with edge maps
 
+The generator is self-contained: it extracts its own configuration and creates
+any necessary control images internally, keeping the harness model-agnostic.
+
 Reference: PROJECT.md Section 5 (Génération d'images)
 """
 
@@ -19,7 +22,7 @@ from typing import TYPE_CHECKING
 import torch
 from PIL import Image
 
-from spatialbench_uc.generators.base import BaseGenerator, GeneratorConfig
+from spatialbench_uc.generators.base import BaseGenerator, GeneratorConfig, PromptData
 from spatialbench_uc.generators.registry import register_generator
 from spatialbench_uc.utils.device import (
     enable_memory_optimizations,
@@ -45,7 +48,7 @@ class DiffusersGenerator(BaseGenerator):
 
     The mode is controlled via config.mode:
     - "prompt_only": Standard text-to-image
-    - "controlnet": Requires control_image in generate()
+    - "controlnet": Creates control images internally from prompt_data
 
     Example config:
         ```yaml
@@ -58,6 +61,17 @@ class DiffusersGenerator(BaseGenerator):
             width: 512
             num_inference_steps: 30
             guidance_scale: 7.5
+        
+        # For ControlNet mode, also include:
+        control_image:
+          method: ellipses_blurred
+          style:
+            line_width: 8
+            blur_radius: 3
+          placement:
+            left_of:
+              box_a: {x_range: [0.05, 0.35], y_range: [0.25, 0.75]}
+              box_b: {x_range: [0.65, 0.95], y_range: [0.25, 0.75]}
         ```
     """
 
@@ -66,7 +80,8 @@ class DiffusersGenerator(BaseGenerator):
         Initialize the diffusers generator.
 
         Args:
-            config: Generator configuration with model_id, mode, and params.
+            config: Generator configuration with model_id, mode, params,
+                   and full_config for ControlNet settings.
 
         Note:
             The pipeline is not loaded until warmup() or first generate() call.
@@ -77,6 +92,9 @@ class DiffusersGenerator(BaseGenerator):
         self.mode = config.mode
         self.controlnet_id = config.controlnet_id
         self.params = config.params or {}
+
+        # Extract control image config for ControlNet mode
+        self._control_config = config.full_config.get("control_image", {})
 
         # Pipeline will be loaded lazily
         self.pipeline: StableDiffusionPipeline | StableDiffusionControlNetPipeline | None = None
@@ -156,25 +174,55 @@ class DiffusersGenerator(BaseGenerator):
         self._is_loaded = True
         logger.info("Pipeline loaded successfully")
 
+    def _create_control_image(self, prompt_data: PromptData) -> Image.Image:
+        """
+        Create a control image for ControlNet from prompt data.
+        
+        This is handled internally by the generator, keeping the harness
+        model-agnostic.
+        """
+        # Import here to avoid circular imports
+        from spatialbench_uc.generators.control_image import create_spatial_edge_map
+
+        width = self.params.get("width", 512)
+        height = self.params.get("height", 512)
+        
+        # Extract control image settings from config
+        placement = self._control_config.get("placement")
+        method = self._control_config.get("method", "ellipses_blurred")
+        style = self._control_config.get("style")
+
+        # Handle legacy method name
+        if method == "synthetic_edges":
+            method = "rectangles"
+
+        return create_spatial_edge_map(
+            relation=prompt_data.relation,
+            width=width,
+            height=height,
+            placement_config=placement,
+            method=method,
+            style=style,
+        )
+
     def generate(
         self,
-        prompt: str,
+        prompt_data: PromptData,
         seed: int,
-        control_image: Image.Image | None = None,
     ) -> Image.Image:
         """
-        Generate an image from a text prompt.
+        Generate an image from prompt data.
+
+        For ControlNet mode, the control image is created internally based
+        on the spatial relation in prompt_data.
 
         Args:
-            prompt: The text prompt describing the desired image.
+            prompt_data: Structured prompt information including the text prompt,
+                        spatial relation, and object names.
             seed: Random seed for reproducibility.
-            control_image: Control image for ControlNet mode (required if mode="controlnet").
 
         Returns:
             The generated image as a PIL Image.
-
-        Raises:
-            ValueError: If ControlNet mode is used without a control image.
         """
         # Lazy load pipeline
         if not self._is_loaded:
@@ -185,7 +233,7 @@ class DiffusersGenerator(BaseGenerator):
 
         # Build generation kwargs
         gen_kwargs = {
-            "prompt": prompt,
+            "prompt": prompt_data.prompt,
             "generator": generator,
             "height": self.params.get("height", 512),
             "width": self.params.get("width", 512),
@@ -198,13 +246,9 @@ class DiffusersGenerator(BaseGenerator):
         if negative_prompt:
             gen_kwargs["negative_prompt"] = negative_prompt
 
-        # Handle ControlNet mode
+        # Handle ControlNet mode - create control image internally
         if self.mode == "controlnet":
-            if control_image is None:
-                raise ValueError(
-                    "ControlNet mode requires a control_image. "
-                    "Pass a PIL Image with edge map or spatial guidance."
-                )
+            control_image = self._create_control_image(prompt_data)
 
             # Ensure control image matches generation size
             target_size = (gen_kwargs["width"], gen_kwargs["height"])

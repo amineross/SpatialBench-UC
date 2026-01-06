@@ -123,4 +123,3 @@ output:
   
   # Template file (Jinja2)
   template: "templates/report.html.j2"
-

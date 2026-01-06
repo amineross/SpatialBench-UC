@@ -6,5 +6,9 @@ Provides tools for:
 - Analysis of human labels vs checker verdicts
 - Risk-coverage curve generation
 - Parameter calibration
+
+Modules:
+- sample: Stratified sampling and HTML interface generation
+- analyze: Confusion matrix, risk-coverage curves, parameter calibration
 """
 

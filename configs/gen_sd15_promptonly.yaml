@@ -41,7 +41,7 @@ generator:
 seeds: [0, 1, 2, 3]
 
 # Device configuration (auto = CUDA > MPS > CPU)
-device: auto
+device: mps
 
 # Output configuration
 output:

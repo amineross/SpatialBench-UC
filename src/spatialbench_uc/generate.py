@@ -4,6 +4,11 @@ Image generation harness for SpatialBench-UC.
 This module generates images from benchmark prompts using pluggable generators.
 It produces a manifest file tracking all generated images for reproducibility.
 
+Design Philosophy:
+- The harness is model-agnostic: it knows nothing about specific generators
+- Generators are self-contained: they extract their own config and context
+- New models can be added without modifying this harness
+
 Usage:
     python -m spatialbench_uc.generate \
         --config configs/gen_sd15_promptonly.yaml \
@@ -26,11 +31,7 @@ from typing import Any
 
 import yaml
 
-from spatialbench_uc.generators.base import GeneratorConfig
-from spatialbench_uc.generators.control_image import (
-    create_spatial_edge_map,
-    load_control_config,
-)
+from spatialbench_uc.generators.base import GeneratorConfig, PromptData
 from spatialbench_uc.generators.registry import get_generator
 
 logging.basicConfig(
@@ -105,10 +106,35 @@ def build_sample_id(run_id: str, prompt_id: str, seed: int) -> str:
     return f"{run_id}_{prompt_id}_seed{seed:04d}"
 
 
+def get_pipeline_name(gen_config: dict[str, Any]) -> str:
+    """
+    Determine pipeline name for manifest based on generator config.
+    
+    This is the only place we have generator-type-specific logic,
+    and it's purely for metadata/documentation purposes.
+    """
+    gen_type = gen_config.get("type", "diffusers")
+    gen_mode = gen_config.get("mode", "prompt_only")
+
+    # Map generator types to pipeline names
+    pipeline_map = {
+        "gligen": "StableDiffusionGLIGENPipeline",
+    }
+    
+    if gen_type in pipeline_map:
+        return pipeline_map[gen_type]
+    
+    # For diffusers, depends on mode
+    if gen_mode == "controlnet":
+        return "StableDiffusionControlNetPipeline"
+    
+    return "StableDiffusionPipeline"
+
+
 def build_manifest_record(
     sample_id: str,
     run_id: str,
-    prompt_data: dict[str, Any],
+    prompt_data: PromptData,
     seed: int,
     image_path: Path,
     config: dict[str, Any],
@@ -124,11 +150,10 @@ def build_manifest_record(
     return {
         "sample_id": sample_id,
         "run_id": run_id,
-        "prompt_id": prompt_data["prompt_id"],
+        "prompt_id": prompt_data.prompt_id,
         "image_path": str(image_path),
         "model": {
-            "pipeline": "StableDiffusionPipeline" if gen_config.get("mode") == "prompt_only"
-                       else "StableDiffusionControlNetPipeline",
+            "pipeline": get_pipeline_name(gen_config),
             "model_id": gen_config.get("model_id", ""),
             "revision": "main",
         },
@@ -141,10 +166,10 @@ def build_manifest_record(
             "scheduler": gen_config.get("params", {}).get("scheduler"),
             "negative_prompt": gen_config.get("params", {}).get("negative_prompt"),
         },
-        "prompt": prompt_data["prompt"],
-        "relation": prompt_data["relation"],
-        "object_a": prompt_data["object_a"]["name"],
-        "object_b": prompt_data["object_b"]["name"],
+        "prompt": prompt_data.prompt,
+        "relation": prompt_data.relation,
+        "object_a": prompt_data.object_a,
+        "object_b": prompt_data.object_b,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "code_version": code_versions,
     }
@@ -168,6 +193,12 @@ Examples:
         --config configs/gen_sd15_controlnet.yaml \\
         --prompts data/prompts/v1.0.0/prompts.jsonl \\
         --out runs/2026-01-02_sd15_controlnet
+
+    # Generate with GLIGEN (bounding box grounding)
+    python -m spatialbench_uc.generate \\
+        --config configs/gen_sd15_gligen.yaml \\
+        --prompts data/prompts/v1.0.0/prompts.jsonl \\
+        --out runs/2026-01-02_sd15_gligen
 
     # Limit to first N prompts for testing
     python -m spatialbench_uc.generate \\
@@ -234,15 +265,6 @@ Examples:
     images_dir = out_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save control images if ControlNet mode
-    gen_config = config.get("generator", {})
-    save_control_images = config.get("output", {}).get("save_control_images", False)
-    if gen_config.get("mode") == "controlnet" and save_control_images:
-        control_images_dir = out_dir / "control_images"
-        control_images_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        control_images_dir = None
-
     # Copy config to output directory
     config_copy_path = out_dir / "gen_config.yaml"
     if not config_copy_path.exists():
@@ -270,24 +292,24 @@ Examples:
                     existing_samples.add(record["sample_id"])
         logger.info(f"Resume mode: found {len(existing_samples)} existing samples")
 
-    # Create generator
-    logger.info("Initializing generator...")
+    # Create generator with full config access
+    # Generators are self-contained: they extract their own settings from full_config
+    gen_config = config.get("generator", {})
+    logger.info(f"Initializing generator: type={gen_config.get('type', 'diffusers')}")
+    
     generator_config = GeneratorConfig(
         type=gen_config.get("type", "diffusers"),
         model_id=gen_config.get("model_id", ""),
         mode=gen_config.get("mode", "prompt_only"),
         controlnet_id=gen_config.get("controlnet_id"),
         params=gen_config.get("params", {}),
+        full_config=config,  # Pass full config for generator to extract its settings
     )
     generator = get_generator(generator_config)
 
     # Warmup (loads model)
     logger.info("Loading model (this may take a minute on first run)...")
     generator.warmup()
-
-    # Get control image config for ControlNet
-    placement_config, edge_method, edge_style = load_control_config(config)
-    logger.info(f"Edge map method: {edge_method}")
 
     # Open manifest for appending
     manifest_file = open(manifest_path, "a")
@@ -296,45 +318,21 @@ Examples:
         generated_count = 0
         skipped_count = 0
 
-        for prompt_idx, prompt_data in enumerate(prompts):
-            prompt_id = prompt_data["prompt_id"]
-            prompt_text = prompt_data["prompt"]
-            relation = prompt_data["relation"]
-
-            # Create control image for ControlNet mode
-            control_image = None
-            if gen_config.get("mode") == "controlnet":
-                width = gen_config.get("params", {}).get("width", 512)
-                height = gen_config.get("params", {}).get("height", 512)
-                control_image = create_spatial_edge_map(
-                    relation,
-                    width,
-                    height,
-                    placement_config=placement_config,
-                    method=edge_method,
-                    style=edge_style,
-                )
-
-                # Save control image if configured
-                if control_images_dir:
-                    control_path = control_images_dir / f"{prompt_id}_control.png"
-                    if not control_path.exists():
-                        control_image.save(control_path)
+        for prompt_idx, prompt_data_raw in enumerate(prompts):
+            # Convert raw prompt dict to structured PromptData
+            prompt_data = PromptData.from_dict(prompt_data_raw)
 
             for seed in seeds:
-                sample_id = build_sample_id(run_id, prompt_id, seed)
+                sample_id = build_sample_id(run_id, prompt_data.prompt_id, seed)
 
                 # Skip if already generated
                 if sample_id in existing_samples:
                     skipped_count += 1
                     continue
 
-                # Generate image
-                image = generator.generate(
-                    prompt=prompt_text,
-                    seed=seed,
-                    control_image=control_image,
-                )
+                # Generate image - model-agnostic call
+                # Each generator handles its own context extraction internally
+                image = generator.generate(prompt_data=prompt_data, seed=seed)
 
                 # Save image
                 image_filename = f"{sample_id}.png"
@@ -360,7 +358,7 @@ Examples:
                     f"[{total_done}/{total_images}] Generated {sample_id}"
                 )
 
-        logger.info(f"Generation complete!")
+        logger.info("Generation complete!")
         logger.info(f"  Generated: {generated_count}")
         logger.info(f"  Skipped (resume): {skipped_count}")
         logger.info(f"  Output: {out_dir}")
@@ -374,4 +372,3 @@ Examples:
 
 if __name__ == "__main__":
     sys.exit(main())
-

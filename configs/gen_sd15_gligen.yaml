@@ -1,0 +1,108 @@
+# =============================================================================
+# SD 1.4 + GLIGEN Generation Configuration
+# =============================================================================
+# Baseline 3: GLIGEN-guided generation with bounding box grounding.
+# Research question: Does explicit spatial grounding improve accuracy?
+#
+# GLIGEN (Grounded-Language-to-Image Generation) enables controllable
+# image generation through bounding box grounding. Unlike ControlNet which
+# interprets visual edge maps, GLIGEN receives explicit "put object X in 
+# region [x0, y0, x1, y1]" instructions.
+#
+# Usage:
+#   python -m spatialbench_uc.generate \
+#     --config configs/gen_sd15_gligen.yaml \
+#     --prompts data/prompts/v1.0.0/prompts.jsonl \
+#     --out runs/<run_id>
+
+# Generator configuration
+generator:
+  # Registry type (see generators/registry.py)
+  type: gligen
+  
+  # Model identifier (HuggingFace model ID)
+  # GLIGEN is based on SD 1.4, trained with object-location pairs
+  model_id: "masterful/gligen-1-4-generation-text-box"
+  
+  # Generation mode (gligen only has one mode)
+  mode: gligen
+  
+  # Generation parameters
+  params:
+    # Image dimensions
+    height: 512
+    width: 512
+    
+    # Diffusion parameters
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    
+    # GLIGEN-specific parameters
+    # Controls how strongly the model follows the bounding box grounding
+    # Higher = more faithful to box positions, potentially less natural
+    # Lower = more creative freedom, potentially ignores boxes
+    # Recommended range: 0.3 - 0.5
+    gligen_scheduled_sampling_beta: 0.3
+    
+    # No negative prompt for baseline
+    negative_prompt: null
+
+# Bounding box placement for spatial relations
+# Boxes are specified as normalized [0, 1] coordinates: [x0, y0, x1, y1]
+# Unlike ControlNet edge maps, these are passed directly to the pipeline
+box_placement:
+  left_of:
+    box_a:
+      x_range: [0.05, 0.35]   # Left third
+      y_range: [0.25, 0.75]   # Vertical center
+    box_b:
+      x_range: [0.65, 0.95]   # Right third
+      y_range: [0.25, 0.75]
+  
+  right_of:
+    # Same as left_of but swapped
+    box_a:
+      x_range: [0.65, 0.95]
+      y_range: [0.25, 0.75]
+    box_b:
+      x_range: [0.05, 0.35]
+      y_range: [0.25, 0.75]
+  
+  above:
+    box_a:
+      x_range: [0.25, 0.75]   # Horizontal center
+      y_range: [0.05, 0.35]   # Top third
+    box_b:
+      x_range: [0.25, 0.75]
+      y_range: [0.65, 0.95]   # Bottom third
+  
+  below:
+    # Same as above but swapped
+    box_a:
+      x_range: [0.25, 0.75]
+      y_range: [0.65, 0.95]
+    box_b:
+      x_range: [0.25, 0.75]
+      y_range: [0.05, 0.35]
+
+# Seeds for reproducibility (K=4 images per prompt)
+# IMPORTANT: Use same seeds as prompt-only for fair comparison
+seeds: [0, 1, 2, 3]
+
+# Device configuration
+device: mps
+
+# Output configuration
+output:
+  format: png
+  save_config: true
+  log_versions: true
+  
+  # Save box visualizations for debugging (optional)
+  # Unlike ControlNet, GLIGEN doesn't use control images,
+  # but we can optionally save box diagrams for verification
+  save_box_diagrams: false
+
+# Resume from interrupted run
+resume: true
+

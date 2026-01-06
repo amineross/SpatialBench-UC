@@ -1,109 +1,59 @@
-# =============================================================================
-# Checker (Evaluator) Configuration v1
-# =============================================================================
-# Configuration for spatial relationship evaluation with uncertainty quantification.
-#
-# Usage:
-#   python -m spatialbench_uc.evaluate \
-#     --manifest runs/<run_id>/manifest.jsonl \
-#     --config configs/checker_v1.yaml \
-#     --out runs/<run_id>/eval
-
-# Detector configuration
-detector:
-  # Primary detector (COCO closed-vocab)
-  # NOTE: Faster R-CNN runs ~25x faster on CPU than MPS on Apple Silicon
-  # due to MPS internal errors with detection model operations
-  primary:
-    type: fasterrcnn
-    params:
-      score_threshold: 0.5
-      device: cpu  # Force CPU - MPS is broken for Faster R-CNN
-  
-  # Secondary detector for agreement (open-vocab)
-  # NOTE: GroundingDINO (transformer-based) runs 3x faster on MPS than CPU
-  secondary:
-    type: grounding_dino
-    model_id: "IDEA-Research/grounding-dino-base"
-    params:
-      box_threshold: 0.35
-      text_threshold: 0.25
-      device: auto  # MPS is optimal for transformer models
-
-# Verdict thresholds
-thresholds:
-  # Minimum detection score to consider object "detected"
-  detection_score: 0.3
-  
-  # Minimum box area (fraction of image) to avoid noise
-  min_area_fraction: 0.005  # 0.5% of image
-  
-  # Maximum IoU between A and B for left/right relations
-  # (high overlap makes spatial judgment unreliable)
-  max_overlap_iou: 0.5
-  
-  # Ambiguity threshold: if two detections have scores within this delta,
-  # consider it ambiguous multi-instance
-  ambiguity_delta: 0.1
-
-# Geometric rules
-geometry:
-  # Margin for UNDECIDABLE zone (fraction of image dimension)
-  # If |delta| <= margin, verdict is UNDECIDABLE
-  margin: 0.05  # 5% of width/height
-  
-  # Use center-to-center distance (vs edge-to-edge)
-  use_centers: true
-
-# Stability testing (perturbation robustness)
-stability:
-  enabled: true
-  
-  # Perturbations to apply
-  perturbations:
-    - type: brightness
-      factor: 1.1
-    - type: brightness
-      factor: 0.9
-    - type: gaussian_blur
-      sigma: 1.0
-    - type: resize
-      scale: 0.9
-  
-  # Stability threshold: fraction of perturbations with consistent verdict
-  # Below this, consider UNDECIDABLE
-  consistency_threshold: 0.5
-
-# Confidence score weights
 confidence:
-  # Conf = det^w_det * geom^w_geom * stab^w_stab * agree^w_agree
+  geom_slope: 0.15
   weights:
+    agreement: 0.1
     detection: 0.4
     geometry: 0.3
     stability: 0.2
-    agreement: 0.1
-  
-  # Geometry confidence slope (see formula in docs)
-  geom_slope: 0.15
-
-# Output configuration
+detector:
+  primary:
+    params:
+      device: cpu
+      score_threshold: 0.5
+    type: fasterrcnn
+  secondary:
+    model_id: IDEA-Research/grounding-dino-base
+    params:
+      box_threshold: 0.35
+      device: auto
+      text_threshold: 0.25
+    type: grounding_dino
+geometry:
+  margin: 0.1
+  use_centers: true
 output:
-  # Per-sample results file
-  results_file: "per_sample.jsonl"
-  
-  # Aggregated metrics file
-  metrics_file: "metrics.json"
-  
-  # Overlay images directory
-  overlays_dir: "overlays"
-  
-  # Generate overlay images for debugging
   generate_overlays: true
-  
-  # Overlay style
+  metrics_file: metrics.json
   overlay_style:
-    box_a_color: [255, 0, 0]     # Red
-    box_b_color: [0, 0, 255]     # Blue
-    text_color: [255, 255, 255]  # White
+    box_a_color:
+    - 255
+    - 0
+    - 0
+    box_b_color:
+    - 0
+    - 0
+    - 255
     font_size: 16
-
+    text_color:
+    - 255
+    - 255
+    - 255
+  overlays_dir: overlays
+  results_file: per_sample.jsonl
+stability:
+  consistency_threshold: 0.5
+  enabled: true
+  perturbations:
+  - factor: 1.1
+    type: brightness
+  - factor: 0.9
+    type: brightness
+  - sigma: 1.0
+    type: gaussian_blur
+  - scale: 0.9
+    type: resize
+thresholds:
+  ambiguity_delta: 0.1
+  detection_score: 0.2
+  max_overlap_iou: 0.5
+  min_area_fraction: 0.005
