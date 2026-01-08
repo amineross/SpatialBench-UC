@@ -250,6 +250,7 @@ class BoxDiffGenerator(BaseGenerator):
             return
 
         # Import the vendored pipeline
+        from diffusers import StableDiffusionPipeline
         from spatialbench_uc.generators.pipelines import StableDiffusionBoxDiffPipeline
 
         self.device = get_device()
@@ -258,13 +259,29 @@ class BoxDiffGenerator(BaseGenerator):
         logger.info(f"Loading BoxDiff pipeline on {self.device} with dtype {self.dtype}")
         logger.info(f"Model: {self.model_id}")
 
-        # Load the base SD model with BoxDiff pipeline
-        self.pipeline = StableDiffusionBoxDiffPipeline.from_pretrained(
+        # Load base SD pipeline first, then construct BoxDiff from components
+        # This avoids compatibility issues with diffusers' from_pretrained
+        base_pipe = StableDiffusionPipeline.from_pretrained(
             self.model_id,
             torch_dtype=self.dtype,
-            safety_checker=None,  # Disable safety checker for benchmarking
-            requires_safety_checker=False,
+            safety_checker=None,
         )
+
+        # Construct BoxDiff pipeline from base pipeline components
+        self.pipeline = StableDiffusionBoxDiffPipeline(
+            vae=base_pipe.vae,
+            text_encoder=base_pipe.text_encoder,
+            tokenizer=base_pipe.tokenizer,
+            unet=base_pipe.unet,
+            scheduler=base_pipe.scheduler,
+            safety_checker=None,
+            feature_extractor=getattr(base_pipe, 'feature_extractor', None),
+            requires_safety_checker=False,
+            image_encoder=getattr(base_pipe, 'image_encoder', None),
+        )
+        
+        # Clean up base pipeline to free memory
+        del base_pipe
 
         # Move to device
         self.pipeline = self.pipeline.to(self.device)

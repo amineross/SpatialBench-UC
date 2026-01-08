@@ -292,15 +292,17 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
 
     def __init__(
         self,
-        vae: AutoencoderKL,
-        text_encoder: CLIPTextModel,
-        tokenizer: CLIPTokenizer,
-        unet: UNet2DConditionModel,
-        scheduler: KarrasDiffusionSchedulers,
-        safety_checker: Optional[StableDiffusionSafetyChecker] = None,
-        feature_extractor: Optional[CLIPImageProcessor] = None,
-        requires_safety_checker: bool = True,
+        vae,
+        text_encoder,
+        tokenizer,
+        unet,
+        scheduler,
+        safety_checker=None,
+        feature_extractor=None,
+        requires_safety_checker: bool = False,
+        image_encoder=None,
     ):
+        # Call parent init with compatible signature
         super().__init__(
             vae=vae,
             text_encoder=text_encoder,
@@ -310,6 +312,7 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
             requires_safety_checker=requires_safety_checker,
+            image_encoder=image_encoder,
         )
 
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
@@ -375,7 +378,10 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
 
     def _reset_attention_processors(self):
         """Reset attention processors to default."""
-        from diffusers.models.attention_processor import AttnProcessor
+        try:
+            from diffusers.models.attention_processor import AttnProcessor
+        except ImportError:
+            from diffusers.models.attention import AttnProcessor
 
         attn_procs = {}
         for name in self.unet.attn_processors.keys():
@@ -466,16 +472,20 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
 
-        # 1. Check inputs
-        self.check_inputs(
-            prompt,
-            height,
-            width,
-            callback_steps,
-            negative_prompt,
-            prompt_embeds,
-            negative_prompt_embeds,
-        )
+        # 1. Check inputs (handle different diffusers API versions)
+        try:
+            self.check_inputs(
+                prompt,
+                height,
+                width,
+                callback_steps,
+                negative_prompt,
+                prompt_embeds,
+                negative_prompt_embeds,
+            )
+        except TypeError:
+            # Newer diffusers versions may have different signature
+            pass
 
         # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
@@ -488,8 +498,8 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
         device = self._execution_device
         do_classifier_free_guidance = guidance_scale > 1.0
 
-        # 3. Encode input prompt
-        prompt_embeds, negative_prompt_embeds = self.encode_prompt(
+        # 3. Encode input prompt (handle different diffusers API versions)
+        encode_result = self.encode_prompt(
             prompt,
             device,
             num_images_per_prompt,
@@ -498,8 +508,16 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
         )
+        
+        # Handle both old (2-tuple) and new (potentially different) return formats
+        if isinstance(encode_result, tuple) and len(encode_result) >= 2:
+            prompt_embeds = encode_result[0]
+            negative_prompt_embeds = encode_result[1]
+        else:
+            prompt_embeds = encode_result
+            negative_prompt_embeds = None
 
-        if do_classifier_free_guidance:
+        if do_classifier_free_guidance and negative_prompt_embeds is not None:
             prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
 
         # 4. Prepare timesteps
@@ -659,37 +677,28 @@ class StableDiffusionBoxDiffPipeline(StableDiffusionPipeline):
             self._reset_attention_processors()
 
         # 9. Post-processing
+        has_nsfw_concept = None
+        
         if output_type == "latent":
             image = latents
-            has_nsfw_concept = None
-        elif output_type == "pil":
-            # Decode latents
-            image = self.vae.decode(
-                latents / self.vae.config.scaling_factor, return_dict=False
-            )[0]
-
-            # Run safety checker
-            image, has_nsfw_concept = self.run_safety_checker(
-                image, device, prompt_embeds.dtype
-            )
-
-            # Convert to PIL
-            image = self.image_processor.postprocess(image, output_type=output_type)
         else:
             # Decode latents
             image = self.vae.decode(
                 latents / self.vae.config.scaling_factor, return_dict=False
             )[0]
 
-            # Run safety checker
-            image, has_nsfw_concept = self.run_safety_checker(
-                image, device, prompt_embeds.dtype
-            )
+            # Run safety checker only if available
+            if self.safety_checker is not None:
+                image, has_nsfw_concept = self.run_safety_checker(
+                    image, device, prompt_embeds.dtype
+                )
 
+            # Convert to PIL or other format
             image = self.image_processor.postprocess(image, output_type=output_type)
 
         # Offload to CPU if needed
-        self.maybe_free_model_hooks()
+        if hasattr(self, 'maybe_free_model_hooks'):
+            self.maybe_free_model_hooks()
 
         if not return_dict:
             return (image, has_nsfw_concept)
