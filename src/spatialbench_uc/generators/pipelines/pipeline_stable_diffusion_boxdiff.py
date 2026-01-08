@@ -81,7 +81,10 @@ def smooth_attention_map(
     sigma: float = 0.5,
 ) -> torch.Tensor:
     """Apply Gaussian smoothing to attention maps."""
-    kernel = gaussian_kernel(kernel_size, sigma).to(attention_map.device)
+    kernel = gaussian_kernel(kernel_size, sigma).to(
+        device=attention_map.device, 
+        dtype=attention_map.dtype
+    )
     kernel = kernel.unsqueeze(0).unsqueeze(0)
 
     # Pad and convolve
@@ -113,19 +116,21 @@ def boxes_to_masks(
     boxes: List[List[float]],
     height: int,
     width: int,
+    device: torch.device = None,
+    dtype: torch.dtype = None,
 ) -> torch.Tensor:
     """Convert normalized bounding boxes to binary masks."""
     masks = []
     for box in boxes:
         x0, y0, x1, y1 = box
-        mask = torch.zeros(height, width)
+        mask = torch.zeros(height, width, device=device, dtype=dtype)
         x0_int = int(x0 * width)
         y0_int = int(y0 * height)
         x1_int = int(x1 * width)
         y1_int = int(y1 * height)
         mask[y0_int:y1_int, x0_int:x1_int] = 1.0
         masks.append(mask)
-    return torch.stack(masks) if masks else torch.empty(0, height, width)
+    return torch.stack(masks) if masks else torch.empty(0, height, width, device=device, dtype=dtype)
 
 
 def compute_boxdiff_loss(
@@ -149,11 +154,12 @@ def compute_boxdiff_loss(
 
     h = w = attention_res
     device = attention_maps.device
+    dtype = attention_maps.dtype
 
-    # Create box masks
-    masks = boxes_to_masks(boxes, h, w).to(device)
+    # Create box masks with matching device and dtype
+    masks = boxes_to_masks(boxes, h, w, device=device, dtype=dtype)
 
-    total_loss = torch.tensor(0.0, device=device)
+    total_loss = torch.tensor(0.0, device=device, dtype=dtype)
 
     # Average attention across heads
     avg_attention = attention_maps.mean(dim=0)  # [h*w, seq_len]
