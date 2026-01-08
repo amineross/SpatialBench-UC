@@ -67,6 +67,38 @@ DEFAULT_BOX_PLACEMENTS = {
 }
 
 
+def _extract_words_from_object(obj: str) -> list[str]:
+    """
+    Extract individual words from an object name for BoxDiff token matching.
+    
+    BoxDiff requires single tokens that match exactly in the tokenized prompt.
+    For multi-word objects like "teddy bear", we return each word separately
+    so they can each be constrained to the same bounding box.
+    
+    Args:
+        obj: Object name (e.g., "cake", "teddy bear", "ice cream")
+        
+    Returns:
+        List of words with articles removed (e.g., ["teddy", "bear"])
+    """
+    # Strip and lowercase for processing
+    obj = obj.strip()
+    
+    # Remove leading articles
+    for article in ["a ", "an ", "the "]:
+        if obj.lower().startswith(article):
+            obj = obj[len(article):]
+            break
+    
+    # Split into individual words
+    words = obj.split()
+    
+    # Filter out empty strings and very short words that might not tokenize well
+    words = [w.strip() for w in words if w.strip()]
+    
+    return words
+
+
 def compute_boxdiff_boxes(
     relation: str,
     object_a: str,
@@ -80,26 +112,26 @@ def compute_boxdiff_boxes(
     normalized [0, 1] coordinates in [x0, y0, x1, y1] format.
 
     IMPORTANT: BoxDiff phrases must be SINGLE TOKENS that appear in the prompt.
-    The pipeline tokenizes the prompt and looks for exact token matches.
-    So we use just the object name (e.g., "cake") not "a cake".
+    For multi-word objects like "teddy bear", we split them and assign the same
+    bounding box to each word token (e.g., both "teddy" and "bear" get box_a).
 
     Args:
         relation: Spatial relation. One of: 'left_of', 'right_of', 'above', 'below'
-        object_a: Name of object A (e.g., "cake")
-        object_b: Name of object B (e.g., "bed")
+        object_a: Name of object A (e.g., "cake", "teddy bear")
+        object_b: Name of object B (e.g., "bed", "ice cream")
         placement_config: Optional dict with custom box placement ranges.
 
     Returns:
         Tuple of (boxes, phrases) where:
         - boxes: List of [x0, y0, x1, y1] normalized coordinates
-        - phrases: List of object names (single tokens) matching the boxes
+        - phrases: List of single-word tokens matching the boxes
 
     Example:
-        >>> boxes, phrases = compute_boxdiff_boxes("left_of", "cake", "bed")
+        >>> boxes, phrases = compute_boxdiff_boxes("left_of", "teddy bear", "bed")
         >>> boxes
-        [[0.05, 0.25, 0.35, 0.75], [0.65, 0.25, 0.95, 0.75]]
+        [[0.05, 0.25, 0.35, 0.75], [0.05, 0.25, 0.35, 0.75], [0.65, 0.25, 0.95, 0.75]]
         >>> phrases
-        ['cake', 'bed']
+        ['teddy', 'bear', 'bed']
     """
     # Get placement for this relation
     if placement_config and relation in placement_config:
@@ -129,20 +161,24 @@ def compute_boxdiff_boxes(
         box_b_cfg["y_range"][1],  # y1
     ]
 
-    # BoxDiff expects single-token phrases that match tokens in the prompt
-    # Use just the object name, not "a cake" - the tokenizer needs exact matches
-    # Strip any existing articles
-    phrase_a = object_a.strip()
-    phrase_b = object_b.strip()
+    # Extract words from each object (handles multi-word like "teddy bear")
+    words_a = _extract_words_from_object(object_a)
+    words_b = _extract_words_from_object(object_b)
     
-    # Remove leading articles if present
-    for article in ["a ", "an ", "the "]:
-        if phrase_a.lower().startswith(article):
-            phrase_a = phrase_a[len(article):]
-        if phrase_b.lower().startswith(article):
-            phrase_b = phrase_b[len(article):]
+    # Build boxes and phrases lists
+    # Each word in object_a gets box_a, each word in object_b gets box_b
+    boxes = []
+    phrases = []
+    
+    for word in words_a:
+        boxes.append(box_a)
+        phrases.append(word)
+    
+    for word in words_b:
+        boxes.append(box_b)
+        phrases.append(word)
 
-    return [box_a, box_b], [phrase_a, phrase_b]
+    return boxes, phrases
 
 
 def load_box_placement_config(config: dict[str, Any]) -> dict[str, Any] | None:

@@ -1156,6 +1156,13 @@ class StableDiffusionBoxDiffPipeline(
         return_losses: bool = False,
     ) -> torch.Tensor:
         """Computes the attend-and-excite loss using the maximum attention value for each token."""
+        # Safety guard: if no tokens matched, return zero loss (fallback to standard SD)
+        if not max_attention_per_index_fg:
+            if return_losses:
+                return 0.0, []
+            else:
+                return 0.0, 0.0
+        
         losses_fg = [max(0, 1.0 - curr_max) for curr_max in max_attention_per_index_fg]
         losses_bg = [max(0, curr_max) for curr_max in max_attention_per_index_bg]
         loss = sum(losses_fg) + sum(losses_bg) + sum(dist_x) + sum(dist_y)
