@@ -79,6 +79,10 @@ def compute_boxdiff_boxes(
     BoxDiff uses the same coordinate format as GLIGEN:
     normalized [0, 1] coordinates in [x0, y0, x1, y1] format.
 
+    IMPORTANT: BoxDiff phrases must be SINGLE TOKENS that appear in the prompt.
+    The pipeline tokenizes the prompt and looks for exact token matches.
+    So we use just the object name (e.g., "cake") not "a cake".
+
     Args:
         relation: Spatial relation. One of: 'left_of', 'right_of', 'above', 'below'
         object_a: Name of object A (e.g., "cake")
@@ -88,14 +92,14 @@ def compute_boxdiff_boxes(
     Returns:
         Tuple of (boxes, phrases) where:
         - boxes: List of [x0, y0, x1, y1] normalized coordinates
-        - phrases: List of object phrases matching the boxes
+        - phrases: List of object names (single tokens) matching the boxes
 
     Example:
         >>> boxes, phrases = compute_boxdiff_boxes("left_of", "cake", "bed")
         >>> boxes
         [[0.05, 0.25, 0.35, 0.75], [0.65, 0.25, 0.95, 0.75]]
         >>> phrases
-        ['a cake', 'a bed']
+        ['cake', 'bed']
     """
     # Get placement for this relation
     if placement_config and relation in placement_config:
@@ -125,9 +129,18 @@ def compute_boxdiff_boxes(
         box_b_cfg["y_range"][1],  # y1
     ]
 
-    # Format phrases (add article if not present)
-    phrase_a = object_a if object_a.startswith(("a ", "an ", "the ")) else f"a {object_a}"
-    phrase_b = object_b if object_b.startswith(("a ", "an ", "the ")) else f"a {object_b}"
+    # BoxDiff expects single-token phrases that match tokens in the prompt
+    # Use just the object name, not "a cake" - the tokenizer needs exact matches
+    # Strip any existing articles
+    phrase_a = object_a.strip()
+    phrase_b = object_b.strip()
+    
+    # Remove leading articles if present
+    for article in ["a ", "an ", "the "]:
+        if phrase_a.lower().startswith(article):
+            phrase_a = phrase_a[len(article):]
+        if phrase_b.lower().startswith(article):
+            phrase_b = phrase_b[len(article):]
 
     return [box_a, box_b], [phrase_a, phrase_b]
 
