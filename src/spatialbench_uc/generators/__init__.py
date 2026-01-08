@@ -24,12 +24,16 @@ from spatialbench_uc.generators.registry import (
 # Import implementations to trigger registration
 from spatialbench_uc.generators import diffusers_gen  # noqa: F401
 from spatialbench_uc.generators import gligen_gen  # noqa: F401
+from spatialbench_uc.generators import boxdiff_gen  # noqa: F401
 
 # Import control image utilities (for external use, e.g., saving debug images)
 from spatialbench_uc.generators.control_image import create_spatial_edge_map
 
 # Import GLIGEN box utilities (for external use, e.g., visualization)
 from spatialbench_uc.generators.gligen_gen import compute_gligen_boxes
+
+# Import BoxDiff box utilities (for external use, e.g., visualization)
+from spatialbench_uc.generators.boxdiff_gen import compute_boxdiff_boxes
 
 __all__ = [
     # Base classes
@@ -44,4 +48,5 @@ __all__ = [
     # Utilities (for external use)
     "create_spatial_edge_map",
     "compute_gligen_boxes",
+    "compute_boxdiff_boxes",
 ]

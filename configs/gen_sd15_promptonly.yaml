@@ -16,7 +16,7 @@ generator:
   type: diffusers
   
   # Model identifier (HuggingFace model ID)
-  model_id: "stable-diffusion-v1-5/stable-diffusion-v1-5"
+  model_id: "runwayml/stable-diffusion-v1-5"
   
   # Generation mode
   mode: prompt_only
@@ -41,7 +41,7 @@ generator:
 seeds: [0, 1, 2, 3]
 
 # Device configuration (auto = CUDA > MPS > CPU)
-device: mps
+device: cuda
 
 # Output configuration
 output:

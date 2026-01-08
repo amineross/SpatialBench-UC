@@ -1,0 +1,152 @@
+# =============================================================================
+# SD 1.5 + BoxDiff Generation Configuration
+# =============================================================================
+# BoxDiff: Training-free box-constrained diffusion for spatial control.
+# Research question: Can attention manipulation achieve spatial grounding
+# without specialized training (like GLIGEN requires)?
+#
+# BoxDiff sits between:
+# - SD 1.5 prompt-only (no structure)
+# - GLIGEN (explicit box grounding with trained model)
+#
+# Key advantage: Works with ANY Stable Diffusion model, no additional training.
+# It manipulates cross-attention maps during denoising to concentrate attention
+# for each phrase within its corresponding bounding box.
+#
+# Reference:
+#   BoxDiff: Text-to-Image Synthesis with Training-Free Box-Constrained Diffusion
+#   https://arxiv.org/abs/2307.10816 (ICCV 2023)
+#
+# Usage:
+#   python -m spatialbench_uc.generate \
+#     --config configs/gen_sd15_boxdiff.yaml \
+#     --prompts data/prompts/v1.0.0/prompts.jsonl \
+#     --out runs/<run_id>
+
+# Generator configuration
+generator:
+  # Registry type (see generators/registry.py)
+  type: boxdiff
+  
+  # Model identifier (HuggingFace model ID)
+  # BoxDiff works with any SD model - using SD 1.5 for fair comparison
+  model_id: "runwayml/stable-diffusion-v1-5"
+  
+  # Generation mode (boxdiff only has one mode)
+  mode: boxdiff
+  
+  # Generation parameters
+  params:
+    # Image dimensions (match other baselines for fair comparison)
+    height: 512
+    width: 512
+    
+    # Diffusion parameters (match PLAN_BACKUP.md: 30 steps, guidance 7.5)
+    num_inference_steps: 30
+    guidance_scale: 7.5
+    
+    # Scheduler (UniPC for consistency with other baselines)
+    scheduler: "UniPCMultistepScheduler"
+    
+    # No negative prompt for baseline (can add for quality experiments)
+    negative_prompt: null
+    
+    # BoxDiff-specific kwargs passed to the pipeline call
+    # Default values are based on the community pipeline and paper recommendations
+    boxdiff_kwargs:
+      # Resolution for attention maps (16x16 for 512px image)
+      attention_res: 16
+      
+      # Probability threshold for outside-box penalty
+      # Higher P = stronger penalty for attention outside boxes
+      P: 0.2
+      
+      # Number of loss iterations per timestep
+      L: 1
+      
+      # Maximum timestep to apply box constraints
+      # After this step, let the model generate freely for refinement
+      max_iter_to_alter: 25
+      
+      # Loss thresholds: only update latents when loss exceeds threshold
+      # Keys are timestep indices, values are loss thresholds
+      # Progressive relaxation allows initial guidance then creative freedom
+      loss_thresholds:
+        0: 0.05
+        10: 0.5
+        20: 0.8
+      
+      # Scale factor for latent gradient updates
+      scale_factor: 20
+      
+      # Scale range for progressive update strength [start, end]
+      # Starts stronger, decreases over time
+      scale_range: [1.0, 0.5]
+      
+      # Attention smoothing parameters
+      smooth_attentions: true
+      sigma: 0.5
+      kernel_size: 3
+      
+      # Refinement mode (experimental)
+      refine: false
+      
+      # Normalize end-of-text token in attention
+      normalize_eot: true
+
+# Bounding box placement for spatial relations
+# Same placement schema as GLIGEN for fair comparison
+# Boxes are specified as normalized [0, 1] coordinates
+box_placement:
+  left_of:
+    box_a:
+      x_range: [0.05, 0.35]   # Left third
+      y_range: [0.25, 0.75]   # Vertical center
+    box_b:
+      x_range: [0.65, 0.95]   # Right third
+      y_range: [0.25, 0.75]
+  
+  right_of:
+    # Same as left_of but swapped
+    box_a:
+      x_range: [0.65, 0.95]
+      y_range: [0.25, 0.75]
+    box_b:
+      x_range: [0.05, 0.35]
+      y_range: [0.25, 0.75]
+  
+  above:
+    box_a:
+      x_range: [0.25, 0.75]   # Horizontal center
+      y_range: [0.05, 0.35]   # Top third
+    box_b:
+      x_range: [0.25, 0.75]
+      y_range: [0.65, 0.95]   # Bottom third
+  
+  below:
+    # Same as above but swapped
+    box_a:
+      x_range: [0.25, 0.75]
+      y_range: [0.65, 0.95]
+    box_b:
+      x_range: [0.25, 0.75]
+      y_range: [0.05, 0.35]
+
+# Seeds for reproducibility (K=4 images per prompt)
+# IMPORTANT: Use same seeds as other baselines for fair comparison
+seeds: [0, 1, 2, 3]
+
+# Device configuration
+device: cuda
+
+# Output configuration
+output:
+  format: png
+  save_config: true
+  log_versions: true
+  
+  # BoxDiff doesn't use control images like ControlNet
+  save_control_images: false
+
+# Resume from interrupted run
+resume: true

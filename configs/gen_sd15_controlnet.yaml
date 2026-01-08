@@ -101,7 +101,7 @@ control_image:
 seeds: [0, 1, 2, 3]
 
 # Device configuration
-device: mps
+device: cuda
 
 # Output configuration
 output:

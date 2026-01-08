@@ -18,7 +18,7 @@ detector:
     type: fasterrcnn
     params:
       score_threshold: 0.5
-      device: cpu  # Force CPU - MPS is broken for Faster R-CNN
+      device: cuda
   
   # Secondary detector for agreement (open-vocab)
   # NOTE: GroundingDINO (transformer-based) runs 3x faster on MPS than CPU
@@ -28,7 +28,7 @@ detector:
     params:
       box_threshold: 0.35
       text_threshold: 0.25
-      device: auto  # MPS is optimal for transformer models
+      device: cuda  # MPS is optimal for transformer models
 
 # Verdict thresholds
 thresholds:
