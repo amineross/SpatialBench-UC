@@ -17,7 +17,7 @@ Reference: PROJECT.md Section 5 (Génération d'images)
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import torch
 from PIL import Image
@@ -92,6 +92,13 @@ class DiffusersGenerator(BaseGenerator):
         self.mode = config.mode
         self.controlnet_id = config.controlnet_id
         self.params = config.params or {}
+        
+        # Model revisions for reproducibility (FIX_PLAN.md 1D.1)
+        self._revision = config.revision
+        self._controlnet_revision = config.controlnet_revision
+        # Actual revisions will be recorded after loading
+        self._actual_revision: str | None = None
+        self._actual_controlnet_revision: str | None = None
 
         # Extract control image config for ControlNet mode
         self._control_config = config.full_config.get("control_image", {})
@@ -120,13 +127,22 @@ class DiffusersGenerator(BaseGenerator):
 
         logger.info(f"Loading pipeline on {self.device} with dtype {self.dtype}")
         logger.info(f"Mode: {self.mode}, Model: {self.model_id}")
+        
+        # FIX_PLAN.md 1D.1: Use explicit revision if provided
+        revision_kwargs = {}
+        if self._revision:
+            revision_kwargs["revision"] = self._revision
+            logger.info(f"Using revision: {self._revision}")
 
         if self.mode == "prompt_only":
             self.pipeline = StableDiffusionPipeline.from_pretrained(
                 self.model_id,
                 torch_dtype=self.dtype,
                 use_safetensors=True,
+                **revision_kwargs,
             )
+            # Record actual revision used
+            self._actual_revision = self._revision or "main"
 
         elif self.mode == "controlnet":
             if not self.controlnet_id:
@@ -136,9 +152,17 @@ class DiffusersGenerator(BaseGenerator):
                 )
 
             logger.info(f"Loading ControlNet: {self.controlnet_id}")
+            
+            # ControlNet revision
+            controlnet_kwargs = {}
+            if self._controlnet_revision:
+                controlnet_kwargs["revision"] = self._controlnet_revision
+                logger.info(f"Using ControlNet revision: {self._controlnet_revision}")
+            
             controlnet = ControlNetModel.from_pretrained(
                 self.controlnet_id,
                 torch_dtype=self.dtype,
+                **controlnet_kwargs,
             )
 
             self.pipeline = StableDiffusionControlNetPipeline.from_pretrained(
@@ -146,7 +170,11 @@ class DiffusersGenerator(BaseGenerator):
                 controlnet=controlnet,
                 torch_dtype=self.dtype,
                 use_safetensors=True,
+                **revision_kwargs,
             )
+            # Record actual revisions used
+            self._actual_revision = self._revision or "main"
+            self._actual_controlnet_revision = self._controlnet_revision or "main"
 
         else:
             raise ValueError(
@@ -291,3 +319,22 @@ class DiffusersGenerator(BaseGenerator):
                 torch.cuda.empty_cache()
 
             logger.info("Pipeline cleaned up")
+
+    def get_model_info(self) -> dict[str, Any]:
+        """
+        Get model information for manifest recording.
+        
+        FIX_PLAN.md 1D.1: Record actual HF model revisions.
+        """
+        info = {
+            "model_id": self.model_id,
+            "revision": self._actual_revision or self._revision or "main",
+        }
+        
+        if self.mode == "controlnet" and self.controlnet_id:
+            info["controlnet_id"] = self.controlnet_id
+            info["controlnet_revision"] = (
+                self._actual_controlnet_revision or self._controlnet_revision or "main"
+            )
+        
+        return info

@@ -335,6 +335,9 @@ def test_stability(
 ) -> tuple[float, float]:
     """Test verdict stability under perturbations.
     
+    FIX (per FIX_PLAN.md 1C.3): If perturbations produce no detections, 
+    stability now decreases properly instead of defaulting to 1.0.
+    
     Args:
         image: Original image.
         detector: Detector instance.
@@ -346,9 +349,9 @@ def test_stability(
         geometry_config: Geometry rules config.
         
     Returns:
-        Tuple of (verdict_stability, iou_stability).
+        Tuple of (combined_stability, verdict_stability).
+        - combined_stability: 0.5 * verdict_stability + 0.5 * iou_stability
         - verdict_stability: Fraction of perturbations with same verdict
-        - iou_stability: Average IoU of boxes between perturbed and original
     """
     if not perturbations:
         return 1.0, 1.0
@@ -358,23 +361,29 @@ def test_stability(
     
     # Get base detections for IoU comparison
     base_detections = detector.detect(image, labels)
-    base_det_a = select_best_detection(base_detections, labels[0], thresholds)
-    base_det_b = select_best_detection(base_detections, labels[1], thresholds)
+    base_det_a = select_best_detection(base_detections, labels[0], thresholds, img_width, img_height)
+    base_det_b = select_best_detection(base_detections, labels[1], thresholds, img_width, img_height)
     
     verdict_matches = 0
     iou_scores = []
+    successful_perturbs = 0
+    missing_perturbs = 0  # FIX 1C.3: Track perturbations with missing detections
     
     for perturb in perturbations:
         try:
             perturbed = apply_perturbation(image, perturb)
             detections = detector.detect(perturbed, labels)
             
-            det_a = select_best_detection(detections, labels[0], thresholds)
-            det_b = select_best_detection(detections, labels[1], thresholds)
+            det_a = select_best_detection(detections, labels[0], thresholds, img_width, img_height)
+            det_b = select_best_detection(detections, labels[1], thresholds, img_width, img_height)
             
             if det_a is None or det_b is None:
-                # Can't compute verdict, doesn't match base
+                # FIX 1C.3: Missing detections under perturbation count as instability
+                # (verdict would be UNDECIDABLE which doesn't match base PASS/FAIL)
+                missing_perturbs += 1
                 continue
+            
+            successful_perturbs += 1
             
             # Compute verdict on perturbed image
             delta = compute_geometric_delta(
@@ -393,11 +402,23 @@ def test_stability(
                 
         except Exception as e:
             logger.warning(f"Perturbation failed: {perturb['type']}: {e}")
+            missing_perturbs += 1
             continue
     
     n_perturbs = len(perturbations)
-    verdict_stability = verdict_matches / n_perturbs if n_perturbs > 0 else 1.0
-    iou_stability = sum(iou_scores) / len(iou_scores) if iou_scores else 1.0
+    
+    # FIX 1C.3: Properly handle cases where perturbations fail to detect objects
+    # If all perturbations produce missing detections, stability should be near 0, not 0.5
+    if successful_perturbs == 0:
+        # All perturbations failed → very unstable (was incorrectly 0.5 before)
+        return 0.0, 0.0
+    
+    # Verdict stability: fraction of all perturbations with matching verdict
+    # Missing detections count as non-matches (base was PASS/FAIL, perturbed would be UNDECIDABLE)
+    verdict_stability = verdict_matches / n_perturbs if n_perturbs > 0 else 0.0
+    
+    # IoU stability: average IoU for successful detections only
+    iou_stability = sum(iou_scores) / len(iou_scores) if iou_scores else 0.0
     
     # Combined stability (per PROJECT.md Section 6.3)
     stability = 0.5 * verdict_stability + 0.5 * iou_stability
@@ -413,13 +434,19 @@ def select_best_detection(
     detections: list[Detection], 
     target_label: str,
     thresholds: dict,
+    image_width: int | None = None,
+    image_height: int | None = None,
 ) -> Detection | None:
     """Select the best detection for a target label.
+    
+    FIX (per FIX_PLAN.md 1C.1): Now applies min_area_fraction filtering.
     
     Args:
         detections: List of Detection objects.
         target_label: The label to match.
         thresholds: Dict with detection thresholds.
+        image_width: Image width for area fraction calculation.
+        image_height: Image height for area fraction calculation.
         
     Returns:
         Best matching Detection or None.
@@ -439,6 +466,21 @@ def select_best_detection(
     
     if not matching:
         return None
+    
+    # FIX: Apply min_area_fraction filter (per FIX_PLAN.md 1C.1)
+    # Filter out tiny spurious detections that are likely noise
+    if image_width is not None and image_height is not None:
+        image_area = image_width * image_height
+        min_area = min_area_frac * image_area
+        
+        def get_box_area(d: Detection) -> float:
+            box = d.box_xyxy
+            return (box[2] - box[0]) * (box[3] - box[1])
+        
+        matching = [d for d in matching if get_box_area(d) >= min_area]
+        
+        if not matching:
+            return None
     
     # Sort by score descending
     matching.sort(key=lambda d: d.score, reverse=True)
@@ -545,8 +587,8 @@ def evaluate_sample(
     
     # Run primary detector
     primary_detections = primary_detector.detect(image, labels)
-    det_a = select_best_detection(primary_detections, object_a, thresholds)
-    det_b = select_best_detection(primary_detections, object_b, thresholds)
+    det_a = select_best_detection(primary_detections, object_a, thresholds, img_width, img_height)
+    det_b = select_best_detection(primary_detections, object_b, thresholds, img_width, img_height)
     
     # Store detector results
     detector_results = {
@@ -693,8 +735,8 @@ def evaluate_sample(
                 ],
             }
             
-            sec_det_a = select_best_detection(secondary_detections, object_a, thresholds)
-            sec_det_b = select_best_detection(secondary_detections, object_b, thresholds)
+            sec_det_a = select_best_detection(secondary_detections, object_a, thresholds, img_width, img_height)
+            sec_det_b = select_best_detection(secondary_detections, object_b, thresholds, img_width, img_height)
             
             if sec_det_a is not None and sec_det_b is not None:
                 # Compute agreement on geometry

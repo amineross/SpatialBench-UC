@@ -969,12 +969,16 @@ def export_csv_tables(
                     f'{m.prompt_pass_rate:.4f},{m.mean_confidence:.4f}\n')
     
     # Counterfactual table
+    # FIX (per FIX_PLAN.md 1B): Export undecidable as a rate for consistency
+    # All percentage columns are now clearly labeled with _rate suffix
     with open(tables_dir / "counterfactual.csv", "w") as f:
-        f.write("run,pairs,both_pass,one_sided,both_fail,undecidable\n")
+        f.write("run,pairs,both_pass_rate,one_sided_rate,both_fail_rate,undecidable_rate,undecidable_count\n")
         for run, m in runs:
+            # Compute undecidable rate
+            undecidable_rate = m.cf_undecidable / m.cf_total_pairs if m.cf_total_pairs > 0 else 0.0
             f.write(f'"{run.name}",{m.cf_total_pairs},{m.cf_both_pass_rate:.4f},'
                     f'{m.cf_one_sided_rate:.4f},{m.cf_both_fail_rate:.4f},'
-                    f'{m.cf_undecidable}\n')
+                    f'{undecidable_rate:.4f},{m.cf_undecidable}\n')
     
     # By relation breakdown
     all_relations = set()

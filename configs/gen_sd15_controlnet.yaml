@@ -16,7 +16,8 @@ generator:
   type: diffusers
   
   # Model identifier (HuggingFace model ID)
-  model_id: "stable-diffusion-v1-5/stable-diffusion-v1-5"
+  # FIX_PLAN.md 1D.2: Unified to canonical runwayml ID for consistency across methods
+  model_id: "runwayml/stable-diffusion-v1-5"
   
   # Generation mode
   mode: controlnet

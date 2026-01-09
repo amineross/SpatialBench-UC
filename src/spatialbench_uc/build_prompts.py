@@ -176,6 +176,17 @@ def build_prompts(
     - A prompt with the base relation (e.g., "A left of B")
     - A linked counterfactual (e.g., "B right of A")
 
+    CANONICAL CONTRACT (per FIX_PLAN.md D1):
+    - Every prompt record must satisfy: Text describes `object_a relation object_b`
+    - For counterfactuals (right_of, below): object_a/object_b are SWAPPED in metadata
+      to match the text semantics and checker's evaluation logic.
+    
+    Counterfactual definition (per FIX_PLAN.md D2):
+    - `A left_of B` ↔ `B right_of A`
+    - `A above B` ↔ `B below A`
+    - cf.relation == inverse(base.relation)
+    - cf.object_a == base.object_b and cf.object_b == base.object_a
+
     Returns a flat list of all prompts.
     """
     prompts = []
@@ -205,6 +216,8 @@ def build_prompts(
                 difficulty_tags.append("multi_word_object")
 
             # Create base prompt record
+            # For base relations (left_of, above): object_a is A, object_b is B
+            # Text: "A photo of a {A} to the left of a {B}" → A left_of B
             base_record = PromptRecord(
                 prompt_id=base_prompt_id,
                 pair_id=pair_id,
@@ -224,16 +237,19 @@ def build_prompts(
             )
 
             # Create counterfactual prompt record
-            # Note: The counterfactual swaps the roles but keeps object_a/object_b
-            # as originally specified (the relation describes their spatial arrangement)
+            # CRITICAL FIX (per FIX_PLAN.md D1 Option B):
+            # For counterfactual (right_of, below), SWAP object_a and object_b
+            # so that the metadata matches the text and checker semantics.
+            # Text: "A photo of a {B} to the right of a {A}" → B right_of A
+            # Therefore: object_a = B, object_b = A
             cf_record = PromptRecord(
                 prompt_id=cf_prompt_id,
                 pair_id=pair_id,
                 version=version,
                 language=language,
                 relation=cf_relation,
-                object_a={"name": obj_a.name, "coco_label": obj_a.name},
-                object_b={"name": obj_b.name, "coco_label": obj_b.name},
+                object_a={"name": obj_b.name, "coco_label": obj_b.name},  # SWAPPED: B is now object_a
+                object_b={"name": obj_a.name, "coco_label": obj_a.name},  # SWAPPED: A is now object_b
                 prompt=cf_text,
                 counterfactual={
                     "prompt_id": base_prompt_id,
@@ -258,13 +274,15 @@ def build_prompts(
 
 def validate_prompts(prompts: list[PromptRecord], config: dict[str, Any]) -> None:
     """
-    Validate the generated prompts according to PROJECT.md Section 4.6.
+    Validate the generated prompts according to PROJECT.md Section 4.6 and FIX_PLAN.md.
 
     Checks:
     - Unique prompt_id
     - Symmetric counterfactual linking
     - Balanced relations
     - No self-pairs (A == B)
+    - PROMPT CONTRACT: Text matches (object_a, relation, object_b) metadata
+    - COUNTERFACTUAL CONTRACT: cf.object_a == base.object_b and cf.object_b == base.object_a
     """
     validation_config = config.get("validation", {})
 
@@ -303,6 +321,80 @@ def validate_prompts(prompts: list[PromptRecord], config: dict[str, Any]) -> Non
             print(f"Warning: Unbalanced relations: {dict(relation_counts)}")
         else:
             print(f"Relations balanced: {dict(relation_counts)}")
+
+    # Check 5: PROMPT CONTRACT (per FIX_PLAN.md D1)
+    # Verify that prompt text matches (object_a, relation, object_b) metadata
+    # The text should describe "object_a relation object_b"
+    print("Validating prompt contract...")
+    contract_violations = []
+    for p in prompts:
+        obj_a_name = p.object_a["name"]
+        obj_b_name = p.object_b["name"]
+        prompt_lower = p.prompt.lower()
+        
+        # Check that object_a appears before object_b in the prompt text
+        # (this validates the text matches the metadata semantics)
+        pos_a = prompt_lower.find(obj_a_name.lower())
+        pos_b = prompt_lower.find(obj_b_name.lower())
+        
+        if pos_a == -1:
+            contract_violations.append(f"{p.prompt_id}: object_a '{obj_a_name}' not found in prompt")
+        elif pos_b == -1:
+            contract_violations.append(f"{p.prompt_id}: object_b '{obj_b_name}' not found in prompt")
+        elif pos_a > pos_b:
+            # object_a should appear before object_b in the text for all our relations
+            contract_violations.append(
+                f"{p.prompt_id}: object_a '{obj_a_name}' appears after object_b '{obj_b_name}' "
+                f"in prompt (violates 'object_a {p.relation} object_b' contract)"
+            )
+    
+    if contract_violations:
+        for v in contract_violations[:10]:  # Show first 10
+            print(f"  CONTRACT VIOLATION: {v}")
+        raise ValueError(f"Found {len(contract_violations)} prompt contract violations! See above.")
+    print(f"  ✓ All {len(prompts)} prompts satisfy text↔metadata contract")
+
+    # Check 6: COUNTERFACTUAL CONTRACT (per FIX_PLAN.md D2)
+    # Verify: cf.relation == inverse(base.relation) and cf.object_a == base.object_b
+    print("Validating counterfactual contract...")
+    cf_violations = []
+    processed_pairs = set()
+    
+    for p in prompts:
+        cf_id = p.counterfactual["prompt_id"]
+        pair_key = tuple(sorted([p.prompt_id, cf_id]))
+        
+        if pair_key in processed_pairs:
+            continue
+        processed_pairs.add(pair_key)
+        
+        cf_prompt = prompt_by_id[cf_id]
+        
+        # Verify relation is inverse
+        expected_cf_relation = COUNTERFACTUAL_MAP.get(p.relation)
+        if cf_prompt.relation != expected_cf_relation:
+            cf_violations.append(
+                f"{p.prompt_id}↔{cf_id}: relation mismatch. "
+                f"Expected cf.relation={expected_cf_relation}, got {cf_prompt.relation}"
+            )
+        
+        # Verify object swap: cf.object_a == base.object_b and cf.object_b == base.object_a
+        if cf_prompt.object_a["name"] != p.object_b["name"]:
+            cf_violations.append(
+                f"{p.prompt_id}↔{cf_id}: object swap violation. "
+                f"Expected cf.object_a='{p.object_b['name']}', got '{cf_prompt.object_a['name']}'"
+            )
+        if cf_prompt.object_b["name"] != p.object_a["name"]:
+            cf_violations.append(
+                f"{p.prompt_id}↔{cf_id}: object swap violation. "
+                f"Expected cf.object_b='{p.object_a['name']}', got '{cf_prompt.object_b['name']}'"
+            )
+    
+    if cf_violations:
+        for v in cf_violations[:10]:  # Show first 10
+            print(f"  CF VIOLATION: {v}")
+        raise ValueError(f"Found {len(cf_violations)} counterfactual contract violations! See above.")
+    print(f"  ✓ All {len(processed_pairs)} counterfactual pairs satisfy D2 contract")
 
     print(f"Validation passed: {len(prompts)} prompts OK")
 

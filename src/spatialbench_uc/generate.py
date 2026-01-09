@@ -139,24 +139,41 @@ def build_manifest_record(
     image_path: Path,
     config: dict[str, Any],
     code_versions: dict[str, str],
+    model_info: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Build a manifest record for a generated image.
 
     Follows the format specified in PROJECT.md Section 2.2.
+    FIX_PLAN.md 1D.1: Now records actual model revisions from generator.
     """
     gen_config = config.get("generator", {})
+    
+    # FIX_PLAN.md 1D.1: Use model_info from generator for actual revision
+    if model_info is None:
+        model_info = {
+            "model_id": gen_config.get("model_id", ""),
+            "revision": gen_config.get("revision", "main"),
+        }
+    
+    # Build model section with actual revision
+    model_section = {
+        "pipeline": get_pipeline_name(gen_config),
+        "model_id": model_info.get("model_id", gen_config.get("model_id", "")),
+        "revision": model_info.get("revision", "main"),
+    }
+    
+    # Add ControlNet info if present
+    if "controlnet_id" in model_info:
+        model_section["controlnet_id"] = model_info["controlnet_id"]
+        model_section["controlnet_revision"] = model_info.get("controlnet_revision", "main")
 
     return {
         "sample_id": sample_id,
         "run_id": run_id,
         "prompt_id": prompt_data.prompt_id,
         "image_path": str(image_path),
-        "model": {
-            "pipeline": get_pipeline_name(gen_config),
-            "model_id": gen_config.get("model_id", ""),
-            "revision": "main",
-        },
+        "model": model_section,
         "gen_params": {
             "seed": seed,
             "height": gen_config.get("params", {}).get("height", 512),
@@ -303,6 +320,9 @@ Examples:
         mode=gen_config.get("mode", "prompt_only"),
         controlnet_id=gen_config.get("controlnet_id"),
         params=gen_config.get("params", {}),
+        # FIX_PLAN.md 1D.1: Pass revision from config for reproducibility
+        revision=gen_config.get("revision"),
+        controlnet_revision=gen_config.get("controlnet_revision"),
         full_config=config,  # Pass full config for generator to extract its settings
     )
     generator = get_generator(generator_config)
@@ -310,6 +330,10 @@ Examples:
     # Warmup (loads model)
     logger.info("Loading model (this may take a minute on first run)...")
     generator.warmup()
+    
+    # FIX_PLAN.md 1D.1: Get model info (including actual revision) from generator
+    model_info = generator.get_model_info()
+    logger.info(f"Model info: {model_info}")
 
     # Open manifest for appending
     manifest_file = open(manifest_path, "a")
@@ -340,6 +364,7 @@ Examples:
                 image.save(image_path)
 
                 # Build and write manifest record
+                # FIX_PLAN.md 1D.1: Pass model_info with actual revision
                 record = build_manifest_record(
                     sample_id=sample_id,
                     run_id=run_id,
@@ -348,6 +373,7 @@ Examples:
                     image_path=image_path.relative_to(out_dir),
                     config=config,
                     code_versions=code_versions,
+                    model_info=model_info,
                 )
                 manifest_file.write(json.dumps(record) + "\n")
                 manifest_file.flush()

@@ -47,13 +47,12 @@ thresholds:
   ambiguity_delta: 0.1
 
 # Geometric rules
+# NOTE: v1 uses center-based geometry only (comparing bounding box centers).
+# The use_centers option was removed as dead config (FIX_PLAN.md 1C.2).
 geometry:
   # Margin for UNDECIDABLE zone (fraction of image dimension)
   # If |delta| <= margin, verdict is UNDECIDABLE
   margin: 0.05  # 5% of width/height
-  
-  # Use center-to-center distance (vs edge-to-edge)
-  use_centers: true
 
 # Stability testing (perturbation robustness)
 stability:

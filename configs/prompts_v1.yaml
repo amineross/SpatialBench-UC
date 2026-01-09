@@ -6,7 +6,7 @@
 # Usage:
 #   python -m spatialbench_uc.build_prompts --config configs/prompts_v1.yaml
 
-version: "v1.0.0"
+version: "v1.0.1"
 
 # Dataset metadata
 dataset:
@@ -39,7 +39,7 @@ generation:
 
 # Output configuration
 output:
-  directory: "data/prompts/v1.0.0"
+  directory: "data/prompts/v1.0.1"
   prompts_file: "prompts.jsonl"
   meta_file: "dataset_meta.json"
   hash_file: "sha256.txt"

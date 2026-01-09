@@ -254,6 +254,10 @@ class BoxDiffGenerator(BaseGenerator):
         self.config = config
         self.model_id = config.model_id
         self.params = config.params or {}
+        
+        # Model revision for reproducibility (FIX_PLAN.md 1D.1)
+        self._revision = config.revision
+        self._actual_revision: str | None = None
 
         # Extract box placement config from full config
         self._box_placement = config.full_config.get("box_placement")
@@ -308,13 +312,23 @@ class BoxDiffGenerator(BaseGenerator):
         logger.info(f"Loading BoxDiff pipeline on {self.device} with dtype {self.dtype}")
         logger.info(f"Model: {self.model_id}")
 
+        # FIX_PLAN.md 1D.1: Use explicit revision if provided
+        revision_kwargs = {}
+        if self._revision:
+            revision_kwargs["revision"] = self._revision
+            logger.info(f"Using revision: {self._revision}")
+
         # Load base SD pipeline first, then construct BoxDiff from components
         # This avoids compatibility issues with diffusers' from_pretrained
         base_pipe = StableDiffusionPipeline.from_pretrained(
             self.model_id,
             torch_dtype=self.dtype,
             safety_checker=None,
+            **revision_kwargs,
         )
+        
+        # Record actual revision used
+        self._actual_revision = self._revision or "main"
 
         # Construct BoxDiff pipeline from base pipeline components
         self.pipeline = StableDiffusionBoxDiffPipeline(
@@ -479,3 +493,14 @@ class BoxDiffGenerator(BaseGenerator):
                 torch.cuda.empty_cache()
 
             logger.info("BoxDiff pipeline cleaned up")
+
+    def get_model_info(self) -> dict[str, Any]:
+        """
+        Get model information for manifest recording.
+        
+        FIX_PLAN.md 1D.1: Record actual HF model revisions.
+        """
+        return {
+            "model_id": self.model_id,
+            "revision": self._actual_revision or self._revision or "main",
+        }

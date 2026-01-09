@@ -197,6 +197,10 @@ class GLIGENGenerator(BaseGenerator):
         self.config = config
         self.model_id = config.model_id
         self.params = config.params or {}
+        
+        # Model revision for reproducibility (FIX_PLAN.md 1D.1)
+        self._revision = config.revision
+        self._actual_revision: str | None = None
 
         # Extract box placement config from full config
         self._box_placement = config.full_config.get("box_placement")
@@ -221,10 +225,20 @@ class GLIGENGenerator(BaseGenerator):
         logger.info(f"Loading GLIGEN pipeline on {self.device} with dtype {self.dtype}")
         logger.info(f"Model: {self.model_id}")
 
+        # FIX_PLAN.md 1D.1: Use explicit revision if provided
+        revision_kwargs = {}
+        if self._revision:
+            revision_kwargs["revision"] = self._revision
+            logger.info(f"Using revision: {self._revision}")
+
         self.pipeline = StableDiffusionGLIGENPipeline.from_pretrained(
             self.model_id,
             torch_dtype=self.dtype,
+            **revision_kwargs,
         )
+        
+        # Record actual revision used
+        self._actual_revision = self._revision or "main"
 
         # Move to device
         self.pipeline = self.pipeline.to(self.device)
@@ -338,3 +352,14 @@ class GLIGENGenerator(BaseGenerator):
                 torch.cuda.empty_cache()
 
             logger.info("GLIGEN pipeline cleaned up")
+
+    def get_model_info(self) -> dict[str, Any]:
+        """
+        Get model information for manifest recording.
+        
+        FIX_PLAN.md 1D.1: Record actual HF model revisions.
+        """
+        return {
+            "model_id": self.model_id,
+            "revision": self._actual_revision or self._revision or "main",
+        }

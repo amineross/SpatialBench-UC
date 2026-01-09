@@ -27,6 +27,10 @@ class GeneratorConfig:
     mode: str = "prompt_only"
     controlnet_id: str | None = None
     params: dict[str, Any] | None = None
+    # Model revision (commit hash or tag) for reproducibility (FIX_PLAN.md 1D.1)
+    # If None, defaults to "main" but the actual resolved revision should be recorded
+    revision: str | None = None
+    controlnet_revision: str | None = None
     # Full config from YAML (set by harness, allows generators to access any section)
     full_config: dict[str, Any] = field(default_factory=dict)
 
@@ -155,3 +159,18 @@ class BaseGenerator(ABC):
         (e.g., to free GPU memory or close API connections).
         """
         pass
+
+    def get_model_info(self) -> dict[str, Any]:
+        """
+        Get model information for manifest recording.
+        
+        Override this method to provide actual revisions used.
+        This supports FIX_PLAN.md 1D.1: Record HF model revisions.
+        
+        Returns:
+            Dict with keys: model_id, revision, and optionally controlnet_id, controlnet_revision
+        """
+        return {
+            "model_id": getattr(self, "model_id", "unknown"),
+            "revision": getattr(self, "_actual_revision", None) or "main",
+        }
