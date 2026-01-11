@@ -31,6 +31,7 @@ generator:
   # Model identifier (HuggingFace model ID)
   # BoxDiff works with any SD model - using SD 1.5 for fair comparison
   model_id: "runwayml/stable-diffusion-v1-5"
+  revision: "451f4fe16113bff5a5d2269ed5ad43b0592e9a14"
   
   # Generation mode (boxdiff only has one mode)
   mode: boxdiff

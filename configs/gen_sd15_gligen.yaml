@@ -23,6 +23,7 @@ generator:
   # Model identifier (HuggingFace model ID)
   # GLIGEN is based on SD 1.4, trained with object-location pairs
   model_id: "masterful/gligen-1-4-generation-text-box"
+  revision: "d2820dc1e9ba6ca082051ce79cfd3eb468ae2c83"
   
   # Generation mode (gligen only has one mode)
   mode: gligen

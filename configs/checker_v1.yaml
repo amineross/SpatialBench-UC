@@ -25,6 +25,7 @@ detector:
   secondary:
     type: grounding_dino
     model_id: "IDEA-Research/grounding-dino-base"
+    revision: "12bdfa3120f3e7ec7b434d90674b3396eccf88eb"
     params:
       box_threshold: 0.35
       text_threshold: 0.25

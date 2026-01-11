@@ -17,6 +17,7 @@ generator:
   
   # Model identifier (HuggingFace model ID)
   model_id: "runwayml/stable-diffusion-v1-5"
+  revision: "451f4fe16113bff5a5d2269ed5ad43b0592e9a14"
   
   # Generation mode
   mode: prompt_only

@@ -18,12 +18,14 @@ generator:
   # Model identifier (HuggingFace model ID)
   # FIX_PLAN.md 1D.2: Unified to canonical runwayml ID for consistency across methods
   model_id: "runwayml/stable-diffusion-v1-5"
+  revision: "451f4fe16113bff5a5d2269ed5ad43b0592e9a14"
   
   # Generation mode
   mode: controlnet
   
   # ControlNet model (Canny edge detection)
   controlnet_id: "lllyasviel/sd-controlnet-canny"
+  controlnet_revision: "7f2f69197050967007f6bbd23ab5e52f0384162a"
   
   # Generation parameters
   params:
