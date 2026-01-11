@@ -1,0 +1,31 @@
+# SpatialBench-UC Direct Dependencies
+# ====================================
+# This file is used by pip-tools to generate a locked requirements.txt
+#
+# Usage:
+#   pip-compile --generate-hashes --output-file requirements.txt requirements.in
+#
+# Note: PyTorch and torchvision are NOT included here.
+#       Install them separately via requirements/torch-{mps,cuda121,cuda118,cpu}.txt
+#       BEFORE installing this lock file.
+
+# Data & Configuration
+numpy
+pandas
+pyyaml
+jsonschema
+
+# Image Processing
+pillow
+opencv-python
+
+# ML Frameworks (PyTorch installed separately for platform compatibility)
+transformers
+diffusers
+accelerate
+safetensors
+
+# Visualization & Reporting
+matplotlib
+jinja2
+tqdm
