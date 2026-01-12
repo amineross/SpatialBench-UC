@@ -43,6 +43,49 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Code Version Tracking (for reproducibility)
+# =============================================================================
+
+def get_code_versions() -> dict[str, str]:
+    """Get versions of key libraries for reproducibility."""
+    import subprocess
+    
+    versions = {}
+
+    try:
+        import torch
+        versions["torch"] = torch.__version__
+    except ImportError:
+        pass
+
+    try:
+        import torchvision
+        versions["torchvision"] = torchvision.__version__
+    except ImportError:
+        pass
+
+    try:
+        import transformers
+        versions["transformers"] = transformers.__version__
+    except ImportError:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent.parent,
+        )
+        if result.returncode == 0:
+            versions["git_commit"] = result.stdout.strip()[:8]
+    except Exception:
+        pass
+
+    return versions
+
+
+# =============================================================================
 # Verdict Types
 # =============================================================================
 
@@ -1009,6 +1052,10 @@ def main():
     logger.info(f"Loaded {len(samples)} samples from manifest")
     logger.info(f"Config: {args.config}")
     
+    # Log code versions for reproducibility
+    code_versions = get_code_versions()
+    logger.info(f"Code versions: {code_versions}")
+    
     # Create output directory
     args.out.mkdir(parents=True, exist_ok=True)
     
@@ -1097,6 +1144,7 @@ def main():
     metrics["timestamp_utc"] = datetime.now(timezone.utc).isoformat()
     metrics["manifest"] = str(args.manifest)
     metrics["config"] = str(args.config)
+    metrics["code_version"] = get_code_versions()
     
     metrics_file = args.out / output_config.get("metrics_file", "metrics.json")
     with open(metrics_file, "w") as f:

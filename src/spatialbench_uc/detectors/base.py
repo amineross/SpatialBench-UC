@@ -58,6 +58,7 @@ class DetectorConfig:
 
     type: str
     model_id: str | None = None
+    revision: str | None = None  # HuggingFace model revision/commit hash
     params: dict[str, Any] | None = None
 
     def __post_init__(self):

@@ -49,6 +49,7 @@ class GroundingDINODetector(BaseDetector):
         """
         self.config = config
         self.model_id = config.model_id or "IDEA-Research/grounding-dino-base"
+        self.revision = config.revision  # HuggingFace model revision
         self.params = config.params or {}
         self.box_threshold = self.params.get("box_threshold", 0.35)
         self.text_threshold = self.params.get("text_threshold", 0.25)
@@ -67,10 +68,12 @@ class GroundingDINODetector(BaseDetector):
         device_pref = self.params.get("device", "auto")
         self._device = get_device(device_pref)
         
-        # Load processor and model
-        self._processor = AutoProcessor.from_pretrained(self.model_id)
+        # Load processor and model (with optional revision for reproducibility)
+        self._processor = AutoProcessor.from_pretrained(
+            self.model_id, revision=self.revision
+        )
         self._model = AutoModelForZeroShotObjectDetection.from_pretrained(
-            self.model_id
+            self.model_id, revision=self.revision
         ).to(self._device)
         self._model.eval()
 
