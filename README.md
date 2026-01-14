@@ -86,7 +86,7 @@ python -m spatialbench_uc.build_prompts --config configs/prompts_v1.yaml
 ```bash
 python -m spatialbench_uc.generate \
   --config configs/gen_sd15_promptonly.yaml \
-  --prompts data/prompts/v1.0.0/prompts.jsonl \
+  --prompts data/prompts/v1.0.1/prompts.jsonl \
   --out runs/sd15_promptonly
 ```
 
@@ -94,9 +94,11 @@ python -m spatialbench_uc.generate \
 ```bash
 python -m spatialbench_uc.generate \
   --config configs/gen_sd15_controlnet.yaml \
-  --prompts data/prompts/v1.0.0/prompts.jsonl \
+  --prompts data/prompts/v1.0.1/prompts.jsonl \
   --out runs/sd15_controlnet
 ```
+
+> **Note**: `data/prompts/v1.0.0/` is deprecated and retained only for traceability. Always use `v1.0.1` for new runs.
 
 ### 3. Evaluate
 

@@ -18,8 +18,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
+import subprocess
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -525,7 +528,11 @@ def plot_counterfactual_consistency(
     output_path: Path,
     title: str = "Counterfactual Consistency",
 ):
-    """Stacked bar chart for counterfactual consistency."""
+    """Stacked bar chart for counterfactual consistency.
+    
+    FIX: Now includes UNDECIDABLE pairs so bars sum to 100%.
+    This prevents misinterpretation when undecidable mass is large.
+    """
     setup_plot_style()
     
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -537,12 +544,23 @@ def plot_counterfactual_consistency(
     both_pass = [r[1].cf_both_pass_rate * 100 for r in runs]
     one_sided = [r[1].cf_one_sided_rate * 100 for r in runs]
     both_fail = [r[1].cf_both_fail_rate * 100 for r in runs]
+    # FIX: Add undecidable rate so bars sum to 100%
+    undecidable = []
+    for r in runs:
+        m = r[1]
+        if m.cf_total_pairs > 0:
+            undecidable.append(m.cf_undecidable / m.cf_total_pairs * 100)
+        else:
+            undecidable.append(0.0)
     
-    # Stacked bars
+    # Stacked bars (order: both_pass, one_sided, both_fail, undecidable)
     ax.bar(x, both_pass, label='Both Pass', color='#4CAF50', edgecolor='#333', linewidth=0.5)
-    ax.bar(x, one_sided, bottom=both_pass, label='One-Sided', color='#FFC107', edgecolor='#333', linewidth=0.5)
+    bottom1 = both_pass
+    ax.bar(x, one_sided, bottom=bottom1, label='One-Sided', color='#FFC107', edgecolor='#333', linewidth=0.5)
     bottom2 = [bp + os for bp, os in zip(both_pass, one_sided)]
     ax.bar(x, both_fail, bottom=bottom2, label='Both Fail', color='#F44336', edgecolor='#333', linewidth=0.5)
+    bottom3 = [b2 + bf for b2, bf in zip(bottom2, both_fail)]
+    ax.bar(x, undecidable, bottom=bottom3, label='Undecidable', color='#9E9E9E', edgecolor='#333', linewidth=0.5)
     
     ax.set_title(title)
     ax.set_ylabel('Percentage of Pairs (%)')
@@ -550,6 +568,51 @@ def plot_counterfactual_consistency(
     ax.set_xticklabels(names, rotation=15, ha='right')
     ax.set_ylim(0, 100)
     ax.legend(loc='upper right', framealpha=0.9)
+    
+    plt.tight_layout()
+    fig.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_coverage_accuracy(
+    runs: list[tuple[str, ReportMetrics, str]],
+    output_path: Path,
+    title: str = "Coverage vs Accuracy Trade-off",
+):
+    """Scatter/bar plot showing coverage vs conditional pass rate.
+    
+    Coverage = (PASS + FAIL) / N (fraction of decided samples)
+    Accuracy proxy = pass_rate_conditional = PASS / (PASS + FAIL)
+    
+    This visualization is central to the UC contribution: models that
+    abstain more (lower coverage) should have higher accuracy on decided cases.
+    """
+    setup_plot_style()
+    
+    fig, ax = plt.subplots(figsize=(7, 5))
+    
+    for name, metrics, color in runs:
+        coverage = metrics.coverage * 100
+        accuracy = metrics.pass_rate_conditional * 100
+        ax.scatter(coverage, accuracy, s=120, c=color, label=name, 
+                   edgecolors='#333', linewidths=1, zorder=3)
+        # Add label near point
+        ax.annotate(name, (coverage, accuracy), 
+                    xytext=(5, 5), textcoords='offset points',
+                    fontsize=8, alpha=0.8)
+    
+    ax.set_xlabel('Coverage (% of samples with PASS/FAIL verdict)')
+    ax.set_ylabel('Conditional Pass Rate (% of decided samples)')
+    ax.set_title(title)
+    ax.set_xlim(0, 105)
+    ax.set_ylim(0, 105)
+    ax.axhline(50, color='#ccc', linestyle='--', linewidth=1, zorder=1)
+    ax.axvline(50, color='#ccc', linestyle='--', linewidth=1, zorder=1)
+    
+    # Remove duplicate labels in legend
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(), loc='best', framealpha=0.9)
     
     plt.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches='tight')
@@ -873,7 +936,7 @@ MINIMAL_TEMPLATE = """<!DOCTYPE html>
                     <td class="num pass">{{ "%.1f"|format(run.metrics.cf_both_pass_rate * 100) }}%</td>
                     <td class="num" style="color: #f39c12;">{{ "%.1f"|format(run.metrics.cf_one_sided_rate * 100) }}%</td>
                     <td class="num fail">{{ "%.1f"|format(run.metrics.cf_both_fail_rate * 100) }}%</td>
-                    <td class="num undecidable">{{ run.metrics.cf_undecidable }}</td>
+                    <td class="num undecidable">{{ "%.1f"|format((run.metrics.cf_undecidable / run.metrics.cf_total_pairs * 100) if run.metrics.cf_total_pairs > 0 else 0) }}% ({{ run.metrics.cf_undecidable }})</td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -886,6 +949,17 @@ MINIMAL_TEMPLATE = """<!DOCTYPE html>
         <figure>
             <img src="{{ figures.confidence_distribution }}" alt="Confidence distribution">
             <figcaption>Figure 4. Distribution of confidence scores for decided samples.</figcaption>
+        </figure>
+    </section>
+    {% endif %}
+    
+    {% if figures.coverage_accuracy %}
+    <section class="section">
+        <h2>Coverage vs Accuracy Trade-off</h2>
+        <p>Coverage measures the fraction of samples with decisive verdicts (PASS or FAIL). Higher coverage with maintained accuracy indicates better calibration.</p>
+        <figure>
+            <img src="{{ figures.coverage_accuracy }}" alt="Coverage vs accuracy">
+            <figcaption>Figure 5. Coverage (% decided) vs Conditional Pass Rate (accuracy on decided samples).</figcaption>
         </figure>
     </section>
     {% endif %}
@@ -999,6 +1073,70 @@ def export_csv_tables(
             f.write(f'"{run.name}",' + ",".join(values) + "\n")
 
 
+def write_report_provenance(
+    output_dir: Path,
+    config_path: Path | None,
+    config: dict,
+    prompts_path: Path | None,
+    run_paths: list[Path],
+) -> None:
+    """Write report provenance metadata for reproducibility.
+    
+    Creates:
+    - report_config.yaml: copy of the config used
+    - report_meta.json: metadata including prompts hash, runs, timestamp, git commit
+    """
+    # Copy config to output
+    if config_path and config_path.exists():
+        shutil.copy2(config_path, output_dir / "report_config.yaml")
+    else:
+        # Write the in-memory config
+        with open(output_dir / "report_config.yaml", "w") as f:
+            yaml.dump(config, f, default_flow_style=False)
+    
+    # Compute prompts hash
+    prompts_hash = None
+    if prompts_path:
+        sha256_file = prompts_path.parent / "sha256.txt"
+        if sha256_file.exists():
+            # Read from pre-computed hash file
+            prompts_hash = sha256_file.read_text().split()[0]
+        elif prompts_path.exists():
+            # Compute hash
+            sha256 = hashlib.sha256()
+            with open(prompts_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    sha256.update(chunk)
+            prompts_hash = sha256.hexdigest()
+    
+    # Get git commit
+    git_commit = None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent.parent,
+        )
+        if result.returncode == 0:
+            git_commit = result.stdout.strip()
+    except Exception:
+        pass
+    
+    # Build metadata
+    meta = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "python_version": sys.version,
+        "git_commit": git_commit,
+        "prompts_path": str(prompts_path) if prompts_path else None,
+        "prompts_sha256": prompts_hash,
+        "run_paths": [str(p) for p in run_paths],
+    }
+    
+    with open(output_dir / "report_meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
+
+
 # =============================================================================
 # Main CLI
 # =============================================================================
@@ -1023,7 +1161,7 @@ def parse_args():
     parser.add_argument(
         "--prompts",
         type=Path,
-        default=Path("data/prompts/v1.0.0/prompts.jsonl"),
+        default=Path("data/prompts/v1.0.1/prompts.jsonl"),
         help="Path to prompts.jsonl for counterfactual linking",
     )
     parser.add_argument(
@@ -1145,7 +1283,9 @@ def main():
                 plot_counterfactual_consistency(plot_data, fig_path, title=title)
                 figures[viz_name] = f"{assets_dir_name}/{filename}"
             
-            # coverage_accuracy plot can be added later
+            elif viz_name == "coverage_accuracy":
+                plot_coverage_accuracy(plot_data, fig_path, title=title)
+                figures[viz_name] = f"{assets_dir_name}/{filename}"
     
     elif not HAS_MATPLOTLIB:
         print("Warning: matplotlib not installed, skipping plots")
@@ -1161,10 +1301,22 @@ def main():
     html_path = args.out / output_cfg.get("index_file", "index.html")
     generate_html_report(runs_data, figures, html_path, config, k)
     
+    # Write provenance metadata
+    print("Writing report provenance...")
+    run_paths_used = [Path(p) for p in args.runs]
+    write_report_provenance(
+        output_dir=args.out,
+        config_path=args.config if args.config.exists() else None,
+        config=config,
+        prompts_path=args.prompts if args.prompts.exists() else None,
+        run_paths=run_paths_used,
+    )
+    
     print(f"\nReport generated: {html_path}")
     print(f"Tables exported to: {args.out / tables_dir_name}")
     if figures:
         print(f"Figures saved to: {assets_dir}")
+    print(f"Provenance saved to: {args.out / 'report_meta.json'}")
     
     return 0
 

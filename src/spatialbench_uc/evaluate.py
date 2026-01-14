@@ -20,6 +20,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import platform
+import subprocess
 import sys
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -960,15 +962,67 @@ def compute_metrics(results: list[EvaluationResult]) -> dict:
         }
     
     # Undecidable reason breakdown
+    # FIX: Bucket reasons consistently to avoid noisy unique keys
+    # Examples: "missing: bed" -> "missing", "near_boundary (|delta|=0.03...)" -> "near_boundary"
     reasons = {}
     for r in results:
         if r.verdict_raw == "UNDECIDABLE" and r.verdict_reason:
-            # Extract reason category
-            reason_cat = r.verdict_reason.split(":")[0] if ":" in r.verdict_reason else r.verdict_reason
+            reason_text = r.verdict_reason
+            # Extract reason category by taking first token before : or (
+            if ":" in reason_text:
+                reason_cat = reason_text.split(":")[0].strip()
+            elif "(" in reason_text:
+                reason_cat = reason_text.split("(")[0].strip()
+            elif " " in reason_text:
+                reason_cat = reason_text.split()[0].strip()
+            else:
+                reason_cat = reason_text
             reasons[reason_cat] = reasons.get(reason_cat, 0) + 1
     metrics["undecidable_reasons"] = reasons
     
     return metrics
+
+
+def write_evaluation_provenance(output_dir: Path, code_versions: dict) -> None:
+    """Write evaluation provenance for reproducibility.
+    
+    Creates provenance.json with:
+    - Python version
+    - Platform info
+    - Device/GPU info
+    - Full git commit
+    - Library versions
+    """
+    from spatialbench_uc.utils.device import device_info
+    
+    # Get full git commit (40 chars)
+    git_commit_full = None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent.parent,
+        )
+        if result.returncode == 0:
+            git_commit_full = result.stdout.strip()
+    except Exception:
+        pass
+    
+    provenance = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "device_info": device_info(),
+        "git_commit": git_commit_full,
+        "library_versions": code_versions,
+    }
+    
+    provenance_path = output_dir / "provenance.json"
+    with open(provenance_path, "w") as f:
+        json.dump(provenance, f, indent=2)
+    
+    logger.info(f"Provenance written to: {provenance_path}")
 
 
 # =============================================================================
@@ -1151,6 +1205,9 @@ def main():
         json.dump(metrics, f, indent=2)
     
     logger.info(f"Metrics written to: {metrics_file}")
+    
+    # Write provenance for reproducibility
+    write_evaluation_provenance(args.out, code_versions)
     
     # Print summary
     print("\n" + "=" * 60)
