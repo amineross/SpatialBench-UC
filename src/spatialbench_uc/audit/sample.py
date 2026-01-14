@@ -22,6 +22,7 @@ import argparse
 import csv
 import json
 import random
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +44,7 @@ class AuditSample:
     checker_verdict_raw: str
     conf: float
     run_id: str
+    run_path: str  # Relative (or absolute) path to the run dir
     method: str  # promptonly, controlnet, gligen, etc.
 
 
@@ -56,18 +58,20 @@ def extract_method_from_run(run_path: Path) -> str:
         sd15_promptonly -> promptonly
     """
     name = run_path.name.lower()
-    
+
     # Remove common prefixes
-    for prefix in ["smoke_", "sd15_", "exp_"]:
+    for prefix in ["smoke_", "exp_"]:
         if name.startswith(prefix):
-            name = name[len(prefix):]
-    
-    # Remove suffixes like _0.5_conditionning_scale
+            name = name[len(prefix) :]
+
+    # Remove Stable Diffusion version prefixes (sd14_, sd15_, sd21_, sd3_, etc.)
+    name = re.sub(r"^sd\d+_", "", name)
+
+    # If the remaining name still has suffixes (e.g., experimental descriptors),
+    # keep the first token as the "method".
     if "_" in name:
-        parts = name.split("_")
-        # Take first meaningful part
-        name = parts[0]
-    
+        name = name.split("_", 1)[0]
+
     return name
 
 
@@ -129,110 +133,168 @@ def load_prompt_text(prompt_id: str, prompts_path: Path | None) -> str:
 
 
 def stratified_sample(
-    all_samples: list[dict],
+    all_samples_by_run: list[list[dict]],
     run_paths: list[Path],
     target_n: int,
     prompts_path: Path | None = None,
 ) -> list[AuditSample]:
-    """Perform stratified sampling across relation, method, and confidence bins."""
-    
-    # Build stratification key: (relation_class, method, conf_bin) -> list of samples
-    strata: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
-    
-    for run_path, samples in zip(run_paths, all_samples):
+    """
+    Perform stratified sampling for human audit.
+
+    Contract (preprint/audit readiness):
+    - Stratify across **method × relation × checker_verdict_raw**
+    - Within each stratum, spread samples across confidence bins when possible
+    """
+
+    # Grouping key for required stratification
+    # (method, relation, verdict_raw) -> list[sample_with_meta]
+    groups: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+
+    for run_path, samples in zip(run_paths, all_samples_by_run):
         method = extract_method_from_run(run_path)
         run_id = run_path.name
-        
+        run_path_str = run_path.as_posix()
+
         for sample in samples:
             relation = sample.get("relation", "unknown")
-            relation_class = classify_relation(relation)
-            conf = sample.get("conf", 0.0)
+            verdict = sample.get("verdict_raw", "UNDECIDABLE")
+            conf = float(sample.get("conf", 0.0) or 0.0)
             conf_bin = get_confidence_bin(conf)
-            
-            key = (relation_class, method, conf_bin)
-            # Store with run info
-            sample_with_meta = {
-                **sample,
-                "_run_path": run_path,
-                "_run_id": run_id,
-                "_method": method,
-            }
-            strata[key].append(sample_with_meta)
-    
-    # Compute target per stratum (proportional allocation)
-    total_available = sum(len(samples) for samples in strata.values())
-    if total_available == 0:
+
+            key = (method, relation, verdict)
+            groups[key].append(
+                {
+                    **sample,
+                    "_run_path": run_path,
+                    "_run_path_str": run_path_str,
+                    "_run_id": run_id,
+                    "_method": method,
+                    "_conf_bin": conf_bin,
+                }
+            )
+
+    if target_n <= 0:
         return []
-    
-    # Allocate samples proportionally, with minimum 1 per stratum
-    stratum_targets = {}
-    allocated = 0
-    
-    for key, samples in strata.items():
-        if len(samples) > 0:
-            # Proportional allocation
-            target = max(1, int(len(samples) * target_n / total_available))
-            # Don't exceed available
-            target = min(target, len(samples))
-            stratum_targets[key] = target
-            allocated += target
-    
-    # Adjust if we're under target
-    if allocated < target_n:
-        # Sort strata by size (descending) and add more
-        sorted_strata = sorted(
-            strata.items(),
-            key=lambda x: len(x[1]),
-            reverse=True
-        )
-        for key, samples in sorted_strata:
-            current = stratum_targets.get(key, 0)
-            if current < len(samples) and allocated < target_n:
-                add = min(len(samples) - current, target_n - allocated)
-                stratum_targets[key] = current + add
-                allocated += add
-    
-    # Sample from each stratum
-    audit_samples = []
-    for key, samples in strata.items():
-        target = stratum_targets.get(key, 0)
-        if target == 0:
+
+    # Allocate samples with a two-level balance:
+    # 1) Balance across methods
+    # 2) Within each method, balance across (relation, verdict) groups
+    group_keys = [k for k, v in groups.items() if v]
+    if not group_keys:
+        return []
+
+    methods = sorted({m for (m, _, _) in group_keys})
+    avail_by_method = {
+        m: sum(len(groups[k]) for k in group_keys if k[0] == m)
+        for m in methods
+    }
+
+    # Method budgets (balanced round-robin, capped by availability)
+    method_budget = {m: 0 for m in methods}
+    remaining = target_n
+    progress = True
+    while remaining > 0 and progress:
+        progress = False
+        for m in methods:
+            if remaining <= 0:
+                break
+            if method_budget[m] < avail_by_method[m]:
+                method_budget[m] += 1
+                remaining -= 1
+                progress = True
+
+    # Group budgets within each method
+    alloc: dict[tuple[str, str, str], int] = {k: 0 for k in group_keys}
+    for m in methods:
+        m_keys = [k for k in group_keys if k[0] == m]
+        if not m_keys or method_budget[m] <= 0:
             continue
-        
-        # Random sample without replacement
-        selected = random.sample(samples, min(target, len(samples)))
-        
+
+        # Shuffle to avoid systematic bias when budget < number of strata
+        random.shuffle(m_keys)
+
+        remaining_m = method_budget[m]
+        progress_m = True
+        while remaining_m > 0 and progress_m:
+            progress_m = False
+            for k in m_keys:
+                if remaining_m <= 0:
+                    break
+                if alloc[k] < len(groups[k]):
+                    alloc[k] += 1
+                    remaining_m -= 1
+                    progress_m = True
+
+    # Helper: sample within a group, spreading across confidence bins
+    def pick_within_group(group_samples: list[dict], n: int) -> list[dict]:
+        if n <= 0:
+            return []
+        by_bin: dict[str, list[dict]] = defaultdict(list)
+        for s in group_samples:
+            by_bin[s.get("_conf_bin", get_confidence_bin(float(s.get("conf", 0.0) or 0.0)))].append(s)
+
+        # Shuffle in-place for randomness
+        for bin_samples in by_bin.values():
+            random.shuffle(bin_samples)
+
+        bin_keys = sorted(by_bin.keys())
+        picked: list[dict] = []
+
+        # Round-robin across bins
+        progress_local = True
+        while len(picked) < n and progress_local:
+            progress_local = False
+            for bk in bin_keys:
+                if len(picked) >= n:
+                    break
+                if by_bin[bk]:
+                    picked.append(by_bin[bk].pop())
+                    progress_local = True
+
+        return picked
+
+    # Build AuditSample rows
+    audit_samples: list[AuditSample] = []
+    for (method, relation, verdict) in group_keys:
+        n = alloc[(method, relation, verdict)]
+        if n <= 0:
+            continue
+
+        selected = pick_within_group(groups[(method, relation, verdict)], n)
         for sample in selected:
             run_path = sample["_run_path"]
             run_id = sample["_run_id"]
+            run_path_str = sample["_run_path_str"]
             method = sample["_method"]
-            
+
             # Get prompt text
             prompt_id = sample.get("prompt_id", "")
             prompt_text = load_prompt_text(prompt_id, prompts_path)
-            
-            # Build paths relative to audit root
-            # Audit root will be the parent of sample.csv
-            image_path_rel = f"../../{run_path}/images/{sample['sample_id']}.png"
+
+            # Build paths relative to audit root (assumes audit CSV is under audits/<version>/)
+            run_path_posix = run_path.as_posix()
+            image_path_rel = f"../../{run_path_posix}/images/{sample['sample_id']}.png"
             overlay_path_rel = None
             if sample.get("overlay_path"):
-                overlay_path_rel = f"../../{run_path}/eval/{sample['overlay_path']}"
-            
-            audit_sample = AuditSample(
-                sample_id=sample["sample_id"],
-                image_path=image_path_rel,
-                overlay_path=overlay_path_rel,
-                prompt=prompt_text,
-                relation=sample.get("relation", "unknown"),
-                object_a=sample.get("object_a", ""),
-                object_b=sample.get("object_b", ""),
-                checker_verdict_raw=sample.get("verdict_raw", "UNDECIDABLE"),
-                conf=sample.get("conf", 0.0),
-                run_id=run_id,
-                method=method,
+                overlay_path_rel = f"../../{run_path_posix}/eval/{sample['overlay_path']}"
+
+            audit_samples.append(
+                AuditSample(
+                    sample_id=sample["sample_id"],
+                    image_path=image_path_rel,
+                    overlay_path=overlay_path_rel,
+                    prompt=prompt_text,
+                    relation=relation,
+                    object_a=sample.get("object_a", ""),
+                    object_b=sample.get("object_b", ""),
+                    checker_verdict_raw=verdict,
+                    conf=float(sample.get("conf", 0.0) or 0.0),
+                    run_id=run_id,
+                    run_path=run_path_str,
+                    method=method,
+                )
             )
-            audit_samples.append(audit_sample)
-    
+
     return audit_samples
 
 
@@ -251,6 +313,7 @@ def write_csv(samples: list[AuditSample], csv_path: Path):
             "checker_verdict_raw",
             "conf",
             "run_id",
+            "run_path",
             "method",
         ])
         
@@ -266,6 +329,7 @@ def write_csv(samples: list[AuditSample], csv_path: Path):
                 sample.checker_verdict_raw,
                 f"{sample.conf:.4f}",
                 sample.run_id,
+                sample.run_path,
                 sample.method,
             ])
 
@@ -286,6 +350,7 @@ def generate_html_interface(samples: list[AuditSample], html_path: Path):
             "checker_verdict_raw": s.checker_verdict_raw,
             "conf": s.conf,
             "run_id": s.run_id,
+            "run_path": s.run_path,
             "method": s.method,
         }
         for s in samples
@@ -787,7 +852,7 @@ def generate_html_interface(samples: list[AuditSample], html_path: Path):
 </html>
 """
     
-    with open(html_path, "w") as f:
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
 
@@ -834,7 +899,8 @@ def main():
     random.seed(args.seed)
     
     # Load samples from all runs
-    all_samples_by_run = []
+    all_samples_by_run: list[list[dict]] = []
+    run_paths_used: list[Path] = []
     for run_path in args.runs:
         if not run_path.exists():
             print(f"Warning: Run path does not exist: {run_path}")
@@ -846,6 +912,7 @@ def main():
             continue
         
         all_samples_by_run.append(samples)
+        run_paths_used.append(run_path)
         print(f"Loaded {len(samples)} samples from {run_path}")
     
     if not all_samples_by_run:
@@ -856,7 +923,7 @@ def main():
     print(f"\nPerforming stratified sampling (target: {args.n} samples)...")
     audit_samples = stratified_sample(
         all_samples_by_run,
-        args.runs,
+        run_paths_used,
         args.n,
         prompts_path=args.prompts,
     )
@@ -879,9 +946,8 @@ def main():
     print("\nStratification Summary:")
     summary = defaultdict(int)
     for sample in audit_samples:
-        rel_class = classify_relation(sample.relation)
         conf_bin = get_confidence_bin(sample.conf)
-        key = f"{rel_class}/{sample.method}/{conf_bin}"
+        key = f"{sample.method}/{sample.relation}/{sample.checker_verdict_raw}/{conf_bin}"
         summary[key] += 1
     
     for key, count in sorted(summary.items()):

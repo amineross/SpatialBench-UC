@@ -281,6 +281,46 @@ def find_image_path(sample_id: str, run_paths: list[Path]) -> Path | None:
     return None
 
 
+def _normalize_rel_path(path_str: str) -> str:
+    """Normalize CSV-stored paths (Windows/backslashes) to forward slashes."""
+    return (path_str or "").replace("\\", "/")
+
+
+def infer_run_dir_from_media_path(media_path: str) -> Path | None:
+    """
+    Infer a run directory from a sample.csv media path.
+
+    Expected patterns (relative to sample.csv folder):
+      - ../../runs/<...>/<run_name>/images/<sample_id>.png
+      - ../../runs/<...>/<run_name>/eval/overlays/<sample_id>.png
+
+    This supports nested runs such as: runs/final_YYYYMMDD_HHMMSS/<method>/
+    """
+    media_path = _normalize_rel_path(media_path)
+    if not media_path:
+        return None
+
+    parts = [p for p in media_path.split("/") if p and p not in (".", "..")]
+    if "runs" not in parts:
+        return None
+
+    i = parts.index("runs")
+    # Find the first segment after "runs" that indicates we're inside a run folder
+    for j in range(i + 1, len(parts)):
+        if parts[j] in ("images", "eval"):
+            return Path(*parts[i:j])
+    return None
+
+
+def resolve_media_path(sample_csv_dir: Path, media_path: str) -> Path | None:
+    """Resolve a media path from sample.csv to an absolute path."""
+    media_path = _normalize_rel_path(media_path)
+    if not media_path:
+        return None
+    p = (sample_csv_dir / Path(media_path)).resolve()
+    return p if p.exists() else None
+
+
 def load_manifests(run_paths: list[Path]) -> dict[str, dict]:
     """Load manifest files to get sample metadata.
     
@@ -308,6 +348,7 @@ def re_evaluate_with_params(
     sample_metadata: dict,
     original_results: dict[str, dict],
     run_paths: list[Path],
+    sample_csv_dir: Path,
     checker_config: dict,
     modified_params: dict,
 ) -> dict[str, dict]:
@@ -332,7 +373,23 @@ def re_evaluate_with_params(
         modified_config.setdefault("geometry", {})["margin"] = modified_params["margin"]
     
     if "detection_score" in modified_params:
-        modified_config.setdefault("thresholds", {})["detection_score"] = modified_params["detection_score"]
+        det_score = modified_params["detection_score"]
+        modified_config.setdefault("thresholds", {})["detection_score"] = det_score
+
+        # IMPORTANT: Make detection_score actually affect detector outputs.
+        # Otherwise, detector-level filtering (e.g., Faster R-CNN score_threshold=0.5)
+        # can make detection_score ineffective for calibration ranges below 0.5.
+        detector_cfg = modified_config.setdefault("detector", {})
+        primary_cfg = detector_cfg.setdefault("primary", {})
+        primary_params = primary_cfg.setdefault("params", {})
+        primary_params["score_threshold"] = det_score
+
+        secondary_cfg = detector_cfg.get("secondary")
+        if isinstance(secondary_cfg, dict):
+            secondary_params = secondary_cfg.setdefault("params", {})
+            # Align GroundingDINO box threshold with detection_score for calibration
+            if "box_threshold" in secondary_params:
+                secondary_params["box_threshold"] = det_score
     
     # Initialize detectors (reuse if possible, but for now create new)
     primary_config = modified_config.get("detector", {}).get("primary", {"type": "fasterrcnn"})
@@ -358,7 +415,8 @@ def re_evaluate_with_params(
             continue
         
         # Find image path
-        image_path = find_image_path(sample_id, run_paths)
+        # Prefer resolving the explicit image_path from sample.csv (robust to nested run dirs)
+        image_path = resolve_media_path(sample_csv_dir, metadata.get("image_path", "")) or find_image_path(sample_id, run_paths)
         if not image_path or not image_path.exists():
             continue
         
@@ -408,6 +466,7 @@ def grid_search_calibration(
     labels: dict[str, dict],
     original_results: dict[str, dict],
     run_paths: list[Path],
+    sample_csv_dir: Path,
     checker_config: dict,
 ) -> dict[str, Any]:
     """Perform grid search over parameter space.
@@ -449,6 +508,7 @@ def grid_search_calibration(
                     sample_metadata,
                     original_results,
                     run_paths,
+                    sample_csv_dir,
                     checker_config,
                     modified_params,
                 )
@@ -608,37 +668,33 @@ def main():
     sample_metadata = load_sample_metadata(args.sample)
     print(f"Loaded {len(sample_metadata)} samples")
     
-    # Find run paths from sample metadata
-    run_paths_set = set()
+    sample_csv_dir = args.sample.parent.resolve()
+
+    # Find run paths from sample metadata (robust to nested run directories)
+    run_paths_set: set[Path] = set()
     for metadata in sample_metadata.values():
+        # New (recommended): explicit run_path column from audit.sample
+        run_path_str = _normalize_rel_path(metadata.get("run_path", ""))
+        if run_path_str:
+            candidate = Path(run_path_str)
+            if candidate.exists():
+                run_paths_set.add(candidate.resolve())
+
+        # Backward-compat: infer from image_path / overlay_path patterns
+        for col in ("image_path", "overlay_path"):
+            inferred = infer_run_dir_from_media_path(metadata.get(col, ""))
+            if inferred and inferred.exists():
+                run_paths_set.add(inferred.resolve())
+
+        # Legacy fallback: try run_id as runs/<run_id>
         run_id = metadata.get("run_id", "")
         if run_id:
-            # Try to find run directory (check multiple possible locations)
-            candidates = [
-                Path("runs") / run_id,
-                Path(run_id),  # Absolute or relative path
-            ]
-            for candidate in candidates:
+            for candidate in (Path("runs") / run_id, Path(run_id)):
                 if candidate.exists():
                     run_paths_set.add(candidate.resolve())
                     break
-    
-    run_paths = list(run_paths_set)
-    if not run_paths:
-        print("Warning: No run directories found, trying to infer from sample.csv paths...")
-        # Try to extract from image_path in sample metadata
-        for metadata in sample_metadata.values():
-            image_path_str = metadata.get("image_path", "")
-            if image_path_str.startswith("../../"):
-                # Extract run_id from path like "../../runs/smoke_gligen/images/..."
-                parts = image_path_str.split("/")
-                if len(parts) >= 3:
-                    run_id = parts[2]
-                    candidate = Path("runs") / run_id
-                    if candidate.exists():
-                        run_paths_set.add(candidate.resolve())
-    
-    run_paths = list(run_paths_set)
+
+    run_paths = sorted(run_paths_set)
     print(f"Found {len(run_paths)} run directories")
     
     # Load original checker results
@@ -687,6 +743,7 @@ def main():
             labels,
             original_results,
             run_paths,
+            sample_csv_dir,
             checker_config,
         )
         
