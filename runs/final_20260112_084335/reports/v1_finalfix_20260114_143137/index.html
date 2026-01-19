@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpatialBench-UC Evaluation Report</title>
+    <style>
+        :root {
+            --text: #1a1a2e;
+            --bg: #fafafa;
+            --accent: #2d3436;
+            --border: #ddd;
+            --pass: #27ae60;
+            --fail: #c0392b;
+            --undecidable: #7f8c8d;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Charter', 'Georgia', serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+        
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem;
+        }
+        
+        .meta {
+            color: #666;
+            font-size: 0.875rem;
+            margin-bottom: 2rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+        
+        th, td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        th {
+            font-weight: 600;
+            background: #f5f5f5;
+        }
+        
+        tr:hover { background: #fafafa; }
+        
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        
+        .pass { color: var(--pass); }
+        .fail { color: var(--fail); }
+        .undecidable { color: var(--undecidable); }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .metric-card {
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: #fff;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        figure {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+        
+        figure img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--border);
+        }
+        
+        figcaption {
+            font-size: 0.8125rem;
+            color: #666;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+        
+        .section { margin-bottom: 2.5rem; }
+        
+        footer {
+            margin-top: 3rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem;
+            color: #999;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.5rem; }
+            .metric-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SpatialBench-UC Evaluation Report</h1>
+        <p class="meta">
+            Generated: 2026-01-14 14:32 UTC<br>
+            Runs: 3
+        </p>
+    </header>
+    
+    <section class="section">
+        <h2>Summary</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th class="num">Samples</th>
+                    <th class="num">Pass Rate</th>
+                    <th class="num">Coverage</th>
+                    <th class="num">Best-of-K Pass</th>
+                    <th class="num">Mean Conf.</th>
+                </tr>
+            </thead>
+            <tbody>
+            
+                <tr>
+                    <td><strong>sd15_promptonly</strong></td>
+                    <td class="num">800</td>
+                    <td class="num">14.5%</td>
+                    <td class="num">28.4%</td>
+                    <td class="num">40.5%</td>
+                    <td class="num">0.246</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>sd15_boxdiff</strong></td>
+                    <td class="num">800</td>
+                    <td class="num">41.1%</td>
+                    <td class="num">43.4%</td>
+                    <td class="num">76.5%</td>
+                    <td class="num">0.410</td>
+                </tr>
+            
+                <tr>
+                    <td><strong>sd14_gligen</strong></td>
+                    <td class="num">800</td>
+                    <td class="num">51.7%</td>
+                    <td class="num">52.1%</td>
+                    <td class="num">78.5%</td>
+                    <td class="num">0.507</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </section>
+    
+    
+    <section class="section">
+        <h2>Pass Rate Comparison</h2>
+        <figure>
+            <img src="assets/pass_rate_comparison.png" alt="Pass rate comparison">
+            <figcaption>Figure 1. Overall pass rate comparison across runs.</figcaption>
+        </figure>
+    </section>
+    
+    
+    <section class="section">
+        <h2>Verdict Distribution</h2>
+        
+        <h3>sd15_promptonly</h3>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-value pass">116</div>
+                <div class="metric-label">Pass</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value fail">111</div>
+                <div class="metric-label">Fail</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value undecidable">573</div>
+                <div class="metric-label">Undecidable</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">51.1%</div>
+                <div class="metric-label">Pass | Decided</div>
+            </div>
+        </div>
+        
+        <h3>sd15_boxdiff</h3>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-value pass">329</div>
+                <div class="metric-label">Pass</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value fail">18</div>
+                <div class="metric-label">Fail</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value undecidable">453</div>
+                <div class="metric-label">Undecidable</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">94.8%</div>
+                <div class="metric-label">Pass | Decided</div>
+            </div>
+        </div>
+        
+        <h3>sd14_gligen</h3>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-value pass">414</div>
+                <div class="metric-label">Pass</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value fail">3</div>
+                <div class="metric-label">Fail</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value undecidable">383</div>
+                <div class="metric-label">Undecidable</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">99.3%</div>
+                <div class="metric-label">Pass | Decided</div>
+            </div>
+        </div>
+        
+    </section>
+    
+    
+    <section class="section">
+        <h2>Pass Rate by Relation</h2>
+        <figure>
+            <img src="assets/pass_rate_by_relation.png" alt="Pass rate by relation">
+            <figcaption>Figure 2. Pass rate breakdown by spatial relation.</figcaption>
+        </figure>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Relation</th>
+                    
+                    <th class="num">sd15_promptonly</th>
+                    
+                    <th class="num">sd15_boxdiff</th>
+                    
+                    <th class="num">sd14_gligen</th>
+                    
+                </tr>
+            </thead>
+            <tbody>
+            
+                <tr>
+                    <td>above</td>
+                    
+                    <td class="num">
+                        
+                        20.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        42.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        52.5%
+                        
+                    </td>
+                    
+                </tr>
+            
+                <tr>
+                    <td>below</td>
+                    
+                    <td class="num">
+                        
+                        16.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        39.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        49.5%
+                        
+                    </td>
+                    
+                </tr>
+            
+                <tr>
+                    <td>left of</td>
+                    
+                    <td class="num">
+                        
+                        10.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        40.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        51.5%
+                        
+                    </td>
+                    
+                </tr>
+            
+                <tr>
+                    <td>right of</td>
+                    
+                    <td class="num">
+                        
+                        10.5%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        42.0%
+                        
+                    </td>
+                    
+                    <td class="num">
+                        
+                        53.5%
+                        
+                    </td>
+                    
+                </tr>
+            
+            </tbody>
+        </table>
+    </section>
+    
+    
+    <section class="section">
+        <h2>Best-of-K Analysis (K=4)</h2>
+        <p>A prompt passes if <em>any</em> of its K generated images pass.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th class="num">Prompts</th>
+                    <th class="num">Pass</th>
+                    <th class="num">Fail</th>
+                    <th class="num">Undecidable</th>
+                    <th class="num">Coverage</th>
+                </tr>
+            </thead>
+            <tbody>
+            
+                <tr>
+                    <td>sd15_promptonly</td>
+                    <td class="num">200</td>
+                    <td class="num pass">81</td>
+                    <td class="num fail">0</td>
+                    <td class="num undecidable">119</td>
+                    <td class="num">40.5%</td>
+                </tr>
+            
+                <tr>
+                    <td>sd15_boxdiff</td>
+                    <td class="num">200</td>
+                    <td class="num pass">153</td>
+                    <td class="num fail">1</td>
+                    <td class="num undecidable">46</td>
+                    <td class="num">77.0%</td>
+                </tr>
+            
+                <tr>
+                    <td>sd14_gligen</td>
+                    <td class="num">200</td>
+                    <td class="num pass">157</td>
+                    <td class="num fail">0</td>
+                    <td class="num undecidable">43</td>
+                    <td class="num">78.5%</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </section>
+    
+    <section class="section">
+        <h2>Counterfactual Consistency</h2>
+        <p>Pairs of logically equivalent prompts (e.g., "A left of B" ↔ "B right of A") should produce consistent results.</p>
+        
+        
+        <figure>
+            <img src="assets/counterfactual_consistency.png" alt="Counterfactual consistency">
+            <figcaption>Figure 3. Counterfactual pair consistency breakdown.</figcaption>
+        </figure>
+        
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th class="num">Pairs</th>
+                    <th class="num">Both Pass</th>
+                    <th class="num">One-Sided</th>
+                    <th class="num">Both Fail</th>
+                    <th class="num">Undecidable</th>
+                </tr>
+            </thead>
+            <tbody>
+            
+                <tr>
+                    <td>sd15_promptonly</td>
+                    <td class="num">100</td>
+                    <td class="num pass">24.0%</td>
+                    <td class="num" style="color: #f39c12;">0.0%</td>
+                    <td class="num fail">0.0%</td>
+                    <td class="num undecidable">76.0% (76)</td>
+                </tr>
+            
+                <tr>
+                    <td>sd15_boxdiff</td>
+                    <td class="num">100</td>
+                    <td class="num pass">67.0%</td>
+                    <td class="num" style="color: #f39c12;">0.0%</td>
+                    <td class="num fail">0.0%</td>
+                    <td class="num undecidable">33.0% (33)</td>
+                </tr>
+            
+                <tr>
+                    <td>sd14_gligen</td>
+                    <td class="num">100</td>
+                    <td class="num pass">74.0%</td>
+                    <td class="num" style="color: #f39c12;">0.0%</td>
+                    <td class="num fail">0.0%</td>
+                    <td class="num undecidable">26.0% (26)</td>
+                </tr>
+            
+            </tbody>
+        </table>
+    </section>
+    
+    
+    <section class="section">
+        <h2>Confidence Distribution</h2>
+        <figure>
+            <img src="assets/confidence_distribution.png" alt="Confidence distribution">
+            <figcaption>Figure 4. Distribution of confidence scores for decided samples.</figcaption>
+        </figure>
+    </section>
+    
+    
+    
+    <section class="section">
+        <h2>Coverage vs Accuracy Trade-off</h2>
+        <p>Coverage measures the fraction of samples with decisive verdicts (PASS or FAIL). Higher coverage with maintained accuracy indicates better calibration.</p>
+        <figure>
+            <img src="assets/coverage_accuracy.png" alt="Coverage vs accuracy">
+            <figcaption>Figure 5. Coverage (% decided) vs Conditional Pass Rate (accuracy on decided samples).</figcaption>
+        </figure>
+    </section>
+    
+    
+    <footer>
+        SpatialBench-UC Report • 2026-01-14 14:32 UTC
+    </footer>
+</body>
+</html>

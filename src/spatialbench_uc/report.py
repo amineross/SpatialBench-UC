@@ -122,6 +122,10 @@ class ReportMetrics:
     prompt_undecidable_count: int = 0
     prompt_coverage: float = 0.0
     prompt_pass_rate: float = 0.0
+
+    # Per-prompt (All-of-K) PASS rate (strict seed robustness)
+    prompt_all_pass_count: int = 0
+    prompt_pass_rate_all: float = 0.0
     
     # By relation breakdown
     by_relation: dict = field(default_factory=dict)
@@ -189,11 +193,17 @@ def load_prompts(prompts_path: Path) -> dict[str, PromptInfo]:
     return prompts
 
 
-def load_run(run_path: Path, name: str, color: str = "#333333") -> RunData:
+def load_run(
+    run_path: Path,
+    name: str,
+    color: str = "#333333",
+    *,
+    eval_subdir: str = "eval",
+) -> RunData:
     """Load all data for a single run."""
     run = RunData(name=name, path=run_path, color=color)
     
-    eval_dir = run_path / "eval"
+    eval_dir = run_path / eval_subdir
     if eval_dir.exists():
         run.samples = load_samples(eval_dir)
         run.metrics = load_metrics(eval_dir)
@@ -230,6 +240,36 @@ def compute_best_of_k(samples: list[Sample], k: int = 4) -> dict[str, str]:
         else:
             verdicts[prompt_id] = "UNDECIDABLE"
     
+    return verdicts
+
+
+def compute_all_of_k(samples: list[Sample], k: int = 4) -> dict[str, str]:
+    """
+    Compute all-of-K verdict per prompt (strict).
+
+    Rules (assuming each prompt has K seeds):
+    - PASS if all K images are PASS
+    - FAIL if any image is FAIL
+    - UNDECIDABLE otherwise (no FAIL, at least one UNDECIDABLE and not all PASS)
+    """
+    by_prompt: dict[str, list[Sample]] = defaultdict(list)
+    for s in samples:
+        by_prompt[s.prompt_id].append(s)
+
+    verdicts: dict[str, str] = {}
+    for prompt_id, prompt_samples in by_prompt.items():
+        # Treat missing seeds conservatively.
+        if len(prompt_samples) != k:
+            verdicts[prompt_id] = "UNDECIDABLE"
+            continue
+
+        if all(s.verdict == "PASS" for s in prompt_samples):
+            verdicts[prompt_id] = "PASS"
+        elif any(s.verdict == "FAIL" for s in prompt_samples):
+            verdicts[prompt_id] = "FAIL"
+        else:
+            verdicts[prompt_id] = "UNDECIDABLE"
+
     return verdicts
 
 
@@ -374,6 +414,11 @@ def compute_metrics(
     prompt_decided = m.prompt_pass_count + m.prompt_fail_count
     m.prompt_coverage = prompt_decided / m.total_prompts if m.total_prompts > 0 else 0.0
     m.prompt_pass_rate = m.prompt_pass_count / m.total_prompts if m.total_prompts > 0 else 0.0
+
+    # All-of-K (strict) prompt PASS rate
+    prompt_all_verdicts = compute_all_of_k(samples, k)
+    m.prompt_all_pass_count = sum(1 for v in prompt_all_verdicts.values() if v == "PASS")
+    m.prompt_pass_rate_all = m.prompt_all_pass_count / m.total_prompts if m.total_prompts > 0 else 0.0
     
     # Counterfactual consistency
     if prompts:
@@ -1041,6 +1086,14 @@ def export_csv_tables(
             f.write(f'"{run.name}",{m.total_samples},{m.pass_rate_overall:.4f},'
                     f'{m.coverage:.4f},{m.pass_rate_conditional:.4f},'
                     f'{m.prompt_pass_rate:.4f},{m.mean_confidence:.4f}\n')
+
+    # Prompt-level metrics table (best-of-K vs all-of-K)
+    with open(tables_dir / "prompt_metrics.csv", "w") as f:
+        f.write("run,total_prompts,best_of_k_pass_rate,all_of_k_pass_rate\n")
+        for run, m in runs:
+            f.write(
+                f'"{run.name}",{m.total_prompts},{m.prompt_pass_rate:.4f},{m.prompt_pass_rate_all:.4f}\n'
+            )
     
     # Counterfactual table
     # FIX (per FIX_PLAN.md 1B): Export undecidable as a rate for consistency
@@ -1079,6 +1132,10 @@ def write_report_provenance(
     config: dict,
     prompts_path: Path | None,
     run_paths: list[Path],
+    *,
+    eval_subdir: str,
+    k: int,
+    resolved_runs: list[dict[str, Any]],
 ) -> None:
     """Write report provenance metadata for reproducibility.
     
@@ -1086,13 +1143,25 @@ def write_report_provenance(
     - report_config.yaml: copy of the config used
     - report_meta.json: metadata including prompts hash, runs, timestamp, git commit
     """
-    # Copy config to output
+    # Copy config to output (raw / as-provided)
     if config_path and config_path.exists():
         shutil.copy2(config_path, output_dir / "report_config.yaml")
     else:
         # Write the in-memory config
         with open(output_dir / "report_config.yaml", "w") as f:
             yaml.dump(config, f, default_flow_style=False)
+
+    # Write an "effective" config that is sufficient to reproduce the report:
+    # resolved run list (after CLI overrides), eval subdir selection, and K.
+    effective = json.loads(json.dumps(config or {}))  # deep copy
+    effective["runs"] = resolved_runs
+    effective["eval_subdir"] = eval_subdir
+    effective.setdefault("metrics", {}).setdefault("best_of_k", {})["k"] = k
+    if prompts_path:
+        effective["prompts_path"] = str(prompts_path)
+
+    with open(output_dir / "report_config_effective.yaml", "w") as f:
+        yaml.dump(effective, f, default_flow_style=False)
     
     # Compute prompts hash
     prompts_hash = None
@@ -1130,6 +1199,8 @@ def write_report_provenance(
         "git_commit": git_commit,
         "prompts_path": str(prompts_path) if prompts_path else None,
         "prompts_sha256": prompts_hash,
+        "eval_subdir": eval_subdir,
+        "k": k,
         "run_paths": [str(p) for p in run_paths],
     }
     
@@ -1175,6 +1246,12 @@ def parse_args():
         type=int,
         default=4,
         help="K value for best-of-K aggregation (default: 4)",
+    )
+    parser.add_argument(
+        "--eval-subdir",
+        type=str,
+        default="eval",
+        help="Evaluation subdirectory inside each run (e.g., eval or eval_precal_YYYYMMDD_HHMMSS)",
     )
     parser.add_argument(
         "--no-plots",
@@ -1226,7 +1303,7 @@ def main():
         name = run_cfg.get("name") or run_path.name
         color = run_cfg.get("color") or default_colors[i % len(default_colors)]
         
-        run = load_run(run_path, name, color)
+        run = load_run(run_path, name, color, eval_subdir=args.eval_subdir)
         if not run.samples:
             print(f"Warning: No samples found in {run_path}")
             continue
@@ -1304,12 +1381,16 @@ def main():
     # Write provenance metadata
     print("Writing report provenance...")
     run_paths_used = [Path(p) for p in args.runs]
+    resolved_runs = [{"name": run.name, "path": str(run.path), "color": run.color} for run, _ in runs_data]
     write_report_provenance(
         output_dir=args.out,
         config_path=args.config if args.config.exists() else None,
         config=config,
         prompts_path=args.prompts if args.prompts.exists() else None,
         run_paths=run_paths_used,
+        eval_subdir=args.eval_subdir,
+        k=k,
+        resolved_runs=resolved_runs,
     )
     
     print(f"\nReport generated: {html_path}")

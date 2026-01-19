@@ -1,0 +1,4 @@
+run,samples,pass_rate,coverage,pass_rate_cond,prompt_pass_rate,mean_conf
+"sd15_promptonly",800,0.1175,0.2375,0.4947,0.3400,0.2059
+"sd15_boxdiff",800,0.4037,0.4250,0.9500,0.7600,0.3948
+"sd14_gligen",800,0.5162,0.5200,0.9928,0.7850,0.5059

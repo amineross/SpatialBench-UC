@@ -20,7 +20,7 @@ detector:
     revision: 12bdfa3120f3e7ec7b434d90674b3396eccf88eb
     type: grounding_dino
 geometry:
-  margin: 0.1
+  margin: 0.05
 output:
   generate_overlays: true
   metrics_file: metrics.json
@@ -54,6 +54,6 @@ stability:
     type: resize
 thresholds:
   ambiguity_delta: 0.1
-  detection_score: 0.2
+  detection_score: 0.3
   max_overlap_iou: 0.5
   min_area_fraction: 0.005

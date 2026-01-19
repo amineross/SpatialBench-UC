@@ -1,0 +1,4 @@
+run,total_prompts,best_of_k_pass_rate,all_of_k_pass_rate
+"sd15_promptonly",200,0.3400,0.0100
+"sd15_boxdiff",200,0.7600,0.0850
+"sd14_gligen",200,0.7850,0.2150

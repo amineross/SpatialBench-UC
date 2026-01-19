@@ -96,7 +96,7 @@ def load_sample_metadata(sample_path: Path) -> dict[str, dict]:
     return samples
 
 
-def load_original_results(run_paths: list[Path]) -> dict[str, dict]:
+def load_original_results(run_paths: list[Path], eval_subdir: str = "eval") -> dict[str, dict]:
     """Load original checker results from all runs.
     
     Returns:
@@ -105,7 +105,7 @@ def load_original_results(run_paths: list[Path]) -> dict[str, dict]:
     all_results = {}
     
     for run_path in run_paths:
-        eval_dir = run_path / "eval"
+        eval_dir = run_path / eval_subdir
         per_sample_file = eval_dir / "per_sample.jsonl"
         
         if not per_sample_file.exists():
@@ -120,6 +120,53 @@ def load_original_results(run_paths: list[Path]) -> dict[str, dict]:
                         all_results[sample_id] = result
     
     return all_results
+
+
+def make_tau_values(
+    sample_metadata: dict[str, dict],
+    original_results: dict[str, dict],
+    *,
+    strategy: str,
+    grid_step: float,
+) -> list[float]:
+    """
+    Build the list of confidence thresholds (tau) to sweep for risk--coverage.
+
+    - strategy="grid": tau in {0, grid_step, ..., 1.0}
+    - strategy="unique": sweep over all unique confidence values observed on the audited subset
+    """
+    if strategy == "grid":
+        step = float(grid_step)
+        if step <= 0 or step > 1:
+            raise ValueError(f"grid_step must be in (0, 1], got {grid_step}")
+
+        n = int(round(1.0 / step))
+        taus = [i * step for i in range(n + 1)]
+        taus[-1] = 1.0  # guard against floating rounding
+        return taus
+
+    if strategy == "unique":
+        confs: list[float] = []
+        for sample_id in sample_metadata.keys():
+            r = original_results.get(sample_id)
+            if not r:
+                continue
+            verdict = r.get("verdict_raw", "")
+            if verdict not in ("PASS", "FAIL"):
+                continue
+            try:
+                conf = float(r.get("conf", 0.0))
+            except Exception:
+                continue
+            if 0.0 <= conf <= 1.0:
+                confs.append(conf)
+
+        unique = sorted(set(confs))
+        # Always include endpoints for interpretability and to ensure a 0-coverage point exists.
+        taus = sorted(set([0.0, 1.0, *unique]))
+        return taus
+
+    raise ValueError(f"Unknown tau sweep strategy: {strategy!r}")
 
 
 def compute_confusion_matrix(
@@ -232,8 +279,10 @@ def compute_risk_coverage_curve(
             curve.append({
                 "tau": tau,
                 "coverage": 0.0,
-                "risk": 1.0,
-                "accuracy": 0.0,
+                # At zero coverage the risk is undefined; for plotting/reporting we set
+                # risk=0 (no decisions => no observed errors) and accuracy=1 by convention.
+                "risk": 0.0,
+                "accuracy": 1.0,
                 "n_covered": 0,
             })
             continue
@@ -589,23 +638,34 @@ def plot_risk_coverage(
         print("Warning: matplotlib not available, skipping plot")
         return
     
-    taus = [p["tau"] for p in curve]
-    coverages = [p["coverage"] for p in curve]
-    risks = [p["risk"] for p in curve]
+    # Sort by coverage so the curve renders left-to-right.
+    curve_sorted = sorted(curve, key=lambda p: p.get("coverage", 0.0))
+    taus = [p["tau"] for p in curve_sorted]
+    coverages = [p["coverage"] for p in curve_sorted]
+    risks = [p["risk"] for p in curve_sorted]
     
     plt.figure(figsize=(8, 6))
-    plt.plot(coverages, risks, 'o-', linewidth=2, markersize=6)
+    # Risk--coverage under a threshold sweep is step-like when confidences are discrete.
+    plt.step(coverages, risks, where="post", linewidth=2, color="C0")
     
-    # Annotate tau values
-    for i, tau in enumerate(taus):
-        if i % 5 == 0:  # Label every 5th point
-            plt.annotate(
-                f'τ={tau:.2f}',
-                (coverages[i], risks[i]),
-                xytext=(5, 5),
-                textcoords='offset points',
-                fontsize=9,
-            )
+    # Annotate a small number of tau values (avoid clutter for dense sweeps)
+    if len(taus) <= 25:
+        label_every = 5
+        label_indices = list(range(0, len(taus), label_every))
+    else:
+        # label quantiles + endpoints
+        q = [0.0, 0.25, 0.5, 0.75, 1.0]
+        label_indices = sorted({min(len(taus) - 1, int(round(p * (len(taus) - 1)))) for p in q})
+
+    for i in label_indices:
+        tau = taus[i]
+        plt.annotate(
+            f'τ={tau:.2f}',
+            (coverages[i], risks[i]),
+            xytext=(5, 5),
+            textcoords='offset points',
+            fontsize=9,
+        )
     
     plt.xlabel('Coverage', fontsize=12)
     plt.ylabel('Risk (1 - Accuracy)', fontsize=12)
@@ -656,6 +716,25 @@ def main():
         action="store_true",
         help="Skip expensive grid search calibration",
     )
+    parser.add_argument(
+        "--eval-subdir",
+        type=str,
+        default="eval",
+        help="Evaluation subdirectory to load per-sample outputs from (e.g., eval or eval_precal_YYYYMMDD_HHMMSS)",
+    )
+    parser.add_argument(
+        "--tau-sweep",
+        type=str,
+        choices=("unique", "grid"),
+        default="unique",
+        help="How to sweep tau for the risk--coverage curve",
+    )
+    parser.add_argument(
+        "--tau-grid-step",
+        type=float,
+        default=0.05,
+        help="Step size for tau sweep when --tau-sweep=grid",
+    )
     
     args = parser.parse_args()
     
@@ -699,7 +778,7 @@ def main():
     
     # Load original checker results
     print("Loading original checker results...")
-    original_results = load_original_results(run_paths)
+    original_results = load_original_results(run_paths, eval_subdir=args.eval_subdir)
     print(f"Loaded {len(original_results)} original results")
     
     # Load checker config
@@ -726,7 +805,12 @@ def main():
     
     # Compute risk-coverage curve
     print("\nComputing risk-coverage curve...")
-    tau_values = [i / 100.0 for i in range(0, 101, 5)]  # 0.00 to 1.00 in steps of 0.05
+    tau_values = make_tau_values(
+        sample_metadata,
+        original_results,
+        strategy=args.tau_sweep,
+        grid_step=args.tau_grid_step,
+    )
     risk_coverage_curve = compute_risk_coverage_curve(
         sample_metadata,
         labels,
@@ -757,6 +841,12 @@ def main():
     # Compile metrics
     metrics = {
         "timestamp_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "eval_subdir": args.eval_subdir,
+        "tau_sweep": {
+            "strategy": args.tau_sweep,
+            "grid_step": args.tau_grid_step if args.tau_sweep == "grid" else None,
+            "n_taus": len(tau_values),
+        },
         "confusion_matrix": confusion,
         "risk_coverage_curve": risk_coverage_curve,
     }

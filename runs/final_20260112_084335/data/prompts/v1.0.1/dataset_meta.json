@@ -1,0 +1,72 @@
+{
+  "version": "v1.0.1",
+  "name": "SpatialBench-UC Prompts",
+  "description": "Spatial relationship benchmark with counterfactual pairs",
+  "language": "en",
+  "created_at": "2026-01-12T08:47:19.120961+00:00",
+  "statistics": {
+    "total_prompts": 200,
+    "total_pairs": 50,
+    "prompts_per_pair": 4,
+    "relations": {
+      "left_of": 50,
+      "right_of": 50,
+      "above": 50,
+      "below": 50
+    },
+    "unique_objects": 33,
+    "object_distribution": {
+      "dog": 32,
+      "cat": 28,
+      "bear": 28,
+      "chair": 20,
+      "horse": 16,
+      "potted plant": 16,
+      "bird": 16,
+      "clock": 16,
+      "tv": 16,
+      "teddy bear": 16,
+      "vase": 16,
+      "apple": 16,
+      "elephant": 12,
+      "bus": 12,
+      "fire hydrant": 12,
+      "banana": 12,
+      "bicycle": 12,
+      "cow": 12,
+      "bed": 8,
+      "giraffe": 8,
+      "laptop": 8,
+      "couch": 8,
+      "zebra": 8,
+      "boat": 8,
+      "truck": 8,
+      "stop sign": 8,
+      "cake": 4,
+      "airplane": 4,
+      "motorcycle": 4,
+      "car": 4,
+      "cup": 4,
+      "bottle": 4,
+      "pizza": 4
+    },
+    "category_distribution": {
+      "food": 9,
+      "furniture": 9,
+      "animal": 40,
+      "indoor": 16,
+      "electronics": 6,
+      "vehicle": 13,
+      "outdoor": 5,
+      "kitchen": 2
+    }
+  },
+  "generation_config": {
+    "seed": 1234,
+    "num_pairs": 50,
+    "relations": [
+      "left_of",
+      "above"
+    ]
+  }
+}

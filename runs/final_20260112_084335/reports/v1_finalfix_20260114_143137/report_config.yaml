@@ -1,0 +1,125 @@
+# =============================================================================
+# Report Generation Configuration v1
+# =============================================================================
+# Configuration for generating HTML reports with visualizations.
+#
+# Usage:
+#   python -m spatialbench_uc.report \
+#     --runs runs/sd15_promptonly runs/sd15_controlnet \
+#     --config configs/report_v1.yaml \
+#     --out reports/v1
+
+# Report metadata
+report:
+  title: "SpatialBench-UC Evaluation Report"
+  version: "v1"
+  description: "Spatial relationship accuracy comparison: Prompt-Only vs ControlNet"
+
+# Runs to include in comparison
+# (Can be overridden via CLI --runs)
+runs:
+  - name: "SD 1.5 Prompt-Only"
+    path: "runs/sd15_promptonly"
+    color: "#4285F4"  # Blue
+  
+  - name: "SD 1.5 + ControlNet"
+    path: "runs/sd15_controlnet"
+    color: "#34A853"  # Green
+
+# Metrics to compute and display
+metrics:
+  # Per-image metrics
+  per_image:
+    - coverage
+    - pass_rate_overall
+    - pass_rate_conditional
+    - undecidable_rate
+  
+  # Best-of-K metrics (per prompt)
+  best_of_k:
+    k: 4
+    metrics:
+      - prompt_pass_rate
+      - prompt_coverage
+  
+  # Counterfactual consistency
+  counterfactual:
+    - both_pass_rate
+    - one_sided_rate
+    - both_fail_rate
+
+# Breakdown dimensions
+breakdowns:
+  - by_relation
+  - by_method
+  - by_object_pair  # Top 10 failing pairs
+
+# Visualizations to generate
+visualizations:
+  # Bar chart: pass rate by method
+  pass_rate_comparison:
+    type: bar
+    title: "Pass Rate by Method"
+    filename: "pass_rate_comparison.png"
+  
+  # Bar chart: pass rate by relation
+  pass_rate_by_relation:
+    type: grouped_bar
+    title: "Pass Rate by Spatial Relation"
+    filename: "pass_rate_by_relation.png"
+  
+  # Histogram: confidence distribution
+  confidence_distribution:
+    type: histogram
+    title: "Confidence Score Distribution"
+    filename: "confidence_distribution.png"
+    bins: 20
+  
+  # Bar chart: counterfactual consistency
+  counterfactual_consistency:
+    type: stacked_bar
+    title: "Counterfactual Consistency"
+    filename: "counterfactual_consistency.png"
+  
+  # Scatter: coverage vs accuracy trade-off
+  coverage_accuracy:
+    type: scatter
+    title: "Coverage vs Accuracy Trade-off"
+    filename: "coverage_accuracy.png"
+
+# Example images to include
+examples:
+  # Top confident failures (for debugging)
+  confident_fails:
+    count: 10
+    sort_by: confidence
+    filter: verdict == "FAIL"
+  
+  # Most uncertain samples
+  uncertain:
+    count: 10
+    sort_by: confidence
+    order: ascending
+    filter: verdict == "UNDECIDABLE"
+  
+  # One-sided counterfactual pairs
+  one_sided:
+    count: 10
+    description: "Pairs where one prompt passed and the other failed"
+
+# Output configuration
+output:
+  # Main HTML file
+  index_file: "index.html"
+  
+  # Assets directory (images)
+  assets_dir: "assets"
+  
+  # Tables directory (CSV exports)
+  tables_dir: "tables"
+  
+  # Examples directory
+  examples_dir: "examples"
+  
+  # Template file (Jinja2)
+  template: "templates/report.html.j2"

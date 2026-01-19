@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-01-16T11:56:43.297771+00:00",
+  "python_version": "3.11.10 (main, Sep  7 2024, 18:35:41) [GCC 11.4.0]",
+  "git_commit": "586dbf599cc2e705b4deda535745f5a98b3f0895",
+  "prompts_path": "data/prompts/v1.0.1/prompts.jsonl",
+  "prompts_sha256": "e13c0ed8f962acb7fed702c689e384184759f17317373bce0ef633667c244d8d",
+  "eval_subdir": "eval",
+  "k": 4,
+  "run_paths": [
+    "runs/final_20260112_084335/sd15_promptonly",
+    "runs/final_20260112_084335/sd15_boxdiff",
+    "runs/final_20260112_084335/sd14_gligen"
+  ]
+}

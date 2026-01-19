@@ -1,0 +1,64 @@
+{
+  "total_samples": 800,
+  "pass_count": 323,
+  "fail_count": 17,
+  "undecidable_count": 460,
+  "coverage": 0.425,
+  "pass_rate_overall": 0.40375,
+  "pass_rate_conditional": 0.95,
+  "undecidable_rate": 0.575,
+  "mean_confidence": 0.39477610335772634,
+  "by_relation": {
+    "left_of": {
+      "count": 200,
+      "pass_count": 80,
+      "fail_count": 2,
+      "undecidable_count": 118,
+      "coverage": 0.41,
+      "pass_rate_overall": 0.4,
+      "pass_rate_conditional": 0.975609756097561
+    },
+    "right_of": {
+      "count": 200,
+      "pass_count": 82,
+      "fail_count": 3,
+      "undecidable_count": 115,
+      "coverage": 0.425,
+      "pass_rate_overall": 0.41,
+      "pass_rate_conditional": 0.9647058823529412
+    },
+    "above": {
+      "count": 200,
+      "pass_count": 84,
+      "fail_count": 7,
+      "undecidable_count": 109,
+      "coverage": 0.455,
+      "pass_rate_overall": 0.42,
+      "pass_rate_conditional": 0.9230769230769231
+    },
+    "below": {
+      "count": 200,
+      "pass_count": 77,
+      "fail_count": 5,
+      "undecidable_count": 118,
+      "coverage": 0.41,
+      "pass_rate_overall": 0.385,
+      "pass_rate_conditional": 0.9390243902439024
+    }
+  },
+  "undecidable_reasons": {
+    "missing": 366,
+    "ambiguous": 63,
+    "high_overlap": 6,
+    "near_boundary": 25
+  },
+  "timestamp_utc": "2026-01-16T11:43:29.465540+00:00",
+  "manifest": "runs/final_20260112_084335/sd15_boxdiff/manifest.jsonl",
+  "config": "configs/checker_v1.yaml",
+  "code_version": {
+    "torch": "2.9.1+cu128",
+    "torchvision": "0.24.1+cu128",
+    "transformers": "4.57.3",
+    "git_commit": "586dbf59"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "total_samples": 800,
+  "pass_count": 329,
+  "fail_count": 18,
+  "undecidable_count": 453,
+  "coverage": 0.43375,
+  "pass_rate_overall": 0.41125,
+  "pass_rate_conditional": 0.9481268011527377,
+  "undecidable_rate": 0.56625,
+  "mean_confidence": 0.40994801456586477,
+  "by_relation": {
+    "left_of": {
+      "count": 200,
+      "pass_count": 81,
+      "fail_count": 3,
+      "undecidable_count": 116,
+      "coverage": 0.42,
+      "pass_rate_overall": 0.405,
+      "pass_rate_conditional": 0.9642857142857143
+    },
+    "right_of": {
+      "count": 200,
+      "pass_count": 84,
+      "fail_count": 3,
+      "undecidable_count": 113,
+      "coverage": 0.435,
+      "pass_rate_overall": 0.42,
+      "pass_rate_conditional": 0.9655172413793104
+    },
+    "above": {
+      "count": 200,
+      "pass_count": 85,
+      "fail_count": 7,
+      "undecidable_count": 108,
+      "coverage": 0.46,
+      "pass_rate_overall": 0.425,
+      "pass_rate_conditional": 0.9239130434782609
+    },
+    "below": {
+      "count": 200,
+      "pass_count": 79,
+      "fail_count": 5,
+      "undecidable_count": 116,
+      "coverage": 0.42,
+      "pass_rate_overall": 0.395,
+      "pass_rate_conditional": 0.9404761904761905
+    }
+  },
+  "undecidable_reasons": {
+    "missing": 366,
+    "ambiguous": 63,
+    "high_overlap": 6,
+    "near_boundary (|delta|=0.037 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.024 <= margin=0.05)": 2,
+    "near_boundary (|delta|=0.021 <= margin=0.05)": 2,
+    "near_boundary (|delta|=0.012 <= margin=0.05)": 2,
+    "near_boundary (|delta|=0.049 <= margin=0.05)": 3,
+    "near_boundary (|delta|=0.028 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.035 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.032 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.015 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.018 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.026 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.030 <= margin=0.05)": 1,
+    "near_boundary (|delta|=0.006 <= margin=0.05)": 1
+  },
+  "timestamp_utc": "2026-01-12T14:07:55.351182+00:00",
+  "manifest": "runs/final_20260112_084335/sd15_boxdiff/manifest.jsonl",
+  "config": "configs/checker_v1.yaml",
+  "code_version": {
+    "torch": "2.9.1+cu128",
+    "torchvision": "0.24.1+cu128",
+    "transformers": "4.57.3",
+    "git_commit": "4fe58fdf"
+  }
+}

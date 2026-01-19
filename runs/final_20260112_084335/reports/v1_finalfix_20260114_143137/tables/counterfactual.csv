@@ -1,0 +1,4 @@
+run,pairs,both_pass_rate,one_sided_rate,both_fail_rate,undecidable_rate,undecidable_count
+"sd15_promptonly",100,0.2400,0.0000,0.0000,0.7600,76
+"sd15_boxdiff",100,0.6700,0.0000,0.0000,0.3300,33
+"sd14_gligen",100,0.7400,0.0000,0.0000,0.2600,26

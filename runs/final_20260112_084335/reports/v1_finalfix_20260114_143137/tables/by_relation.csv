@@ -1,0 +1,4 @@
+run,above_pass_rate,below_pass_rate,left_of_pass_rate,right_of_pass_rate
+"sd15_promptonly",0.2050,0.1650,0.1050,0.1050
+"sd15_boxdiff",0.4250,0.3950,0.4050,0.4200
+"sd14_gligen",0.5250,0.4950,0.5150,0.5350

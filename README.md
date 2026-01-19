@@ -1,210 +1,114 @@
 # SpatialBench-UC
 
-**Uncertainty-aware spatial relationship benchmark for text-to-image models.**
+**SpatialBench-UC** is a benchmark and evaluation toolkit for **pairwise spatial relations** in text-to-image generation, with explicit **abstention and uncertainty modeling**.
 
-SpatialBench-UC evaluates whether text-to-image models correctly follow spatial constraints (e.g., "A is to the left of B") with:
+Spatial verification via object detection + geometry is often ambiguous (missing detections, multiple plausible boxes, near-boundary geometry). SpatialBench-UC outputs **PASS / FAIL / UNDECIDABLE** with a **confidence score**, enabling **risk-coverage analysis** instead of a single scalar score.
 
-- **Uncertainty quantification**: PASS / FAIL / UNDECIDABLE verdicts with calibrated confidence scores
-- **Counterfactual consistency**: Tests logically equivalent prompt pairs ("A left of B" ↔ "B right of A")
-- **Reproducible evaluation**: Detector-based geometric verification, not learned scorers
+## Repository contents
+
+| Component | Description | Path |
+|-----------|-------------|------|
+| **Prompt suite** | 200 prompts (50 object pairs x 4 relations), 100 counterfactual pairs | `data/prompts/v1.0.1/` |
+| **Checker** | Detector-based verification with abstention and confidence | `src/spatialbench_uc/evaluate.py` |
+| **Reporting** | Tables and plots from per-sample outputs | `src/spatialbench_uc/report.py` |
+| **Audit utilities** | Risk-coverage analysis on human-labeled subset | `src/spatialbench_uc/audit/` |
+| **Frozen run bundle** | Paper results (no image regeneration needed) | `runs/final_20260112_084335/` |
 
 ## Installation
 
-### Step 1: Create Environment
+### Linux with CUDA 12.1 (recommended for paper reproduction)
 
 ```bash
-# Using venv (recommended)
-python3 -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
-
-# Or using conda
-conda create -n spatialbench python=3.10 -y
-conda activate spatialbench
-```
-
-### Step 2: Install PyTorch (Platform-Specific)
-
-Choose ONE based on your system:
-
-**Apple Silicon Mac (M1/M2/M3):**
-```bash
-pip install -r requirements/torch-mps.txt
-```
-
-**Linux with NVIDIA GPU (CUDA 12.1):**
-```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements/torch-cuda121.txt
-```
-
-**Linux with NVIDIA GPU (CUDA 11.8):**
-```bash
-pip install -r requirements/torch-cuda118.txt
-```
-
-**CPU only (any platform):**
-```bash
-pip install -r requirements/torch-cpu.txt
-```
-
-### Step 3: Install SpatialBench-UC
-
-```bash
-# Install the package in editable mode
+pip install --require-hashes -r requirements/lock/requirements-linux-cuda121.txt
 pip install -e .
-
-# Or with development tools
-pip install -e ".[dev]"
 ```
 
-### Step 4: Generate COCO Vocabulary (One-Time Setup)
+### Other platforms
 
 ```bash
-python scripts/generate_coco_vocab.py
+# macOS (Apple Silicon)
+pip install -r requirements/torch-mps.txt && pip install -e .
+
+# Linux CUDA 11.8
+pip install -r requirements/torch-cuda118.txt && pip install -e .
+
+# CPU only
+pip install -r requirements/torch-cpu.txt && pip install -e .
 ```
 
-This extracts the official COCO class names from torchvision's pretrained weights.
+## Reproducing paper results
 
-### Step 5: Verify Installation
+The frozen run bundle contains all per-sample outputs needed to reproduce paper tables **without regenerating images**.
+
+```
+runs/final_20260112_084335/
+├── sd15_promptonly/eval/per_sample.jsonl   # Checker outputs (calibrated)
+├── sd15_boxdiff/eval/per_sample.jsonl
+├── sd14_gligen/eval/per_sample.jsonl
+├── reports/v1_calibrated_*/tables/*.csv    # CSV tables
+└── audits/v1/                              # Human audit labels + analysis
+```
+
+### Regenerate report from existing outputs
 
 ```bash
-python -c "import spatialbench_uc; print('SpatialBench-UC installed successfully!')"
-python -c "from spatialbench_uc.detectors.fasterrcnn import get_coco_class_names; print(f'COCO classes: {len(get_coco_class_names())}')"
+python -m spatialbench_uc.report \
+  --config configs/report_v1.yaml \
+  --eval-subdir eval
 ```
 
-## Quick Start
-
-### 1. Build Benchmark Prompts
+### Recompute audit metrics (no GPU required)
 
 ```bash
-python -m spatialbench_uc.build_prompts --config configs/prompts_v1.yaml
+python scripts/recompute_audit_metrics_from_eval_jsonl.py \
+  --sample runs/final_20260112_084335/audits/v1/sample.csv \
+  --labels runs/final_20260112_084335/audits/v1/labels_filled.json \
+  --out runs/final_20260112_084335/audits/v1/analysis_calibrated \
+  --eval-subdir eval \
+  --tau-sweep unique
 ```
 
-### 2. Generate Images
+## Running the checker on new images
 
-**Baseline 1: Prompt-Only (SD 1.5)**
+### 1. Generate images
+
 ```bash
 python -m spatialbench_uc.generate \
   --config configs/gen_sd15_promptonly.yaml \
   --prompts data/prompts/v1.0.1/prompts.jsonl \
-  --out runs/sd15_promptonly
+  --out runs/my_run
 ```
 
-**Baseline 2: ControlNet (SD 1.5 + Canny)**
-```bash
-python -m spatialbench_uc.generate \
-  --config configs/gen_sd15_controlnet.yaml \
-  --prompts data/prompts/v1.0.1/prompts.jsonl \
-  --out runs/sd15_controlnet
-```
-
-> **Note**: `data/prompts/v1.0.0/` is deprecated and retained only for traceability. Always use `v1.0.1` for new runs.
-
-### 3. Evaluate
+### 2. Evaluate with the checker
 
 ```bash
 python -m spatialbench_uc.evaluate \
-  --manifest runs/sd15_promptonly/manifest.jsonl \
+  --manifest runs/my_run/manifest.jsonl \
   --config configs/checker_v1.yaml \
-  --out runs/sd15_promptonly/eval
+  --out runs/my_run/eval
 ```
 
-### 4. Generate Report
+### 3. Generate report
 
 ```bash
 python -m spatialbench_uc.report \
-  --runs runs/sd15_promptonly runs/sd15_controlnet \
-  --out reports/v1
+  --runs runs/my_run \
+  --out runs/my_run/reports/v1
 ```
 
-## Project Structure
+## Key terminology
 
-```
-spatialbench-uc/
-├── configs/                    # Configuration files
-│   ├── prompts_v1.yaml        # Prompt generation config
-│   ├── gen_sd15_promptonly.yaml
-│   ├── gen_sd15_controlnet.yaml
-│   └── checker_v1.yaml
-├── data/
-│   ├── objects/               # COCO vocabulary
-│   │   ├── coco_classes.json  # Auto-generated from torchvision
-│   │   └── coco_subset_v1.json
-│   └── prompts/               # Generated prompts
-├── src/spatialbench_uc/       # Main package
-│   ├── generators/            # Text-to-image generators
-│   ├── detectors/             # Object detectors
-│   └── utils/                 # Utilities
-├── scripts/                   # Utility scripts
-├── runs/                      # Generated images and evaluations
-└── reports/                   # HTML reports
-```
-
-## Extending SpatialBench-UC
-
-### Adding a New Generator
-
-```python
-from spatialbench_uc.generators import BaseGenerator, register_generator
-
-@register_generator("my_model")
-class MyGenerator(BaseGenerator):
-    def __init__(self, config):
-        # Load your model
-        pass
-    
-    def generate(self, prompt: str, seed: int, control_image=None):
-        # Generate and return PIL.Image
-        pass
-```
-
-Then create a config file:
-
-```yaml
-generator:
-  type: my_model
-  model_id: your-model-id
-  params:
-    height: 512
-    width: 512
-```
-
-### Adding a New Detector
-
-```python
-from spatialbench_uc.detectors import BaseDetector, Detection, register_detector
-
-@register_detector("my_detector")
-class MyDetector(BaseDetector):
-    def __init__(self, config):
-        # Load your model
-        pass
-    
-    def detect(self, image, labels: list[str]) -> list[Detection]:
-        # Return list of Detection(box_xyxy, score, label)
-        pass
-```
-
-## v1 Scope
-
-| Baseline | Model | Method | Research Question |
-|----------|-------|--------|-------------------|
-| 1 | SD 1.5 | Prompt-Only | Can text alone convey spatial relations? |
-| 2 | SD 1.5 | + ControlNet Canny | Does structural guidance help? |
-
-## License
-
-MIT License
+- **PASS/FAIL/UNDECIDABLE** are **checker outputs**, not ground-truth accuracy.
+- **Coverage** = fraction of samples where the checker makes a decision (PASS or FAIL).
+- **Risk** (audited subset) = 1 - accuracy on samples decided by both checker and human.
 
 ## Citation
 
-If you use SpatialBench-UC in your research, please cite:
+If you use this benchmark, please cite:
 
-```bibtex
-@software{spatialbench_uc,
-  title = {SpatialBench-UC: Uncertainty-aware Spatial Relationship Benchmark},
-  year = {2026},
-  url = {https://github.com/yourusername/spatialbench-uc}
-}
-```
+TODO
 
+## License

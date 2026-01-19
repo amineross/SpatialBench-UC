@@ -27,8 +27,8 @@ wheels/
 # Virtual environments
 .venv/
 venv/
-ENV/
-env/
+/ENV/
+/env/
 
 # IDE
 .idea/
@@ -51,20 +51,22 @@ htmlcov/
 # ruff
 .ruff_cache/
 
-# Project-specific
-runs/
-reports/
-audits/
-paper/*.pdf
-paper/*.aux
-paper/*.log
-paper/*.bbl
-paper/*.blg
-paper/*.out
+# ============================================================
+# SpatialBench-UC: Public release configuration
+# ============================================================
 
-# Lockfiles (optional, reference only)
-locks/*.txt
-!locks/README.md
+# Runs folder: include metadata, exclude large image files
+runs/**/images/
+runs/**/overlays/
+
+# Keep standalone audits folder gitignored (now inside runs/)
+/audits/
+
+# Root-level reports folder (reports are inside runs/)
+/reports/
+
+# Preprint files (published on arXiv separately)
+preprint/
 
 # HuggingFace cache
 .cache/
@@ -72,11 +74,20 @@ locks/*.txt
 # Model weights (downloaded at runtime)
 *.bin
 *.safetensors
+
+# Keep data files tracked
 !data/objects/*.json
 
+# Internal development notes (not for public release)
 PROJECT.md
 PLAN_BACKUP.md
 JOURNAL.md
 FIX_PLAN.md
 AUDIT.md
 final_fix.md
+expert_analysis_and_fix.md
+final_fixes19.md
+lightweight/
+
+# Temporary archives
+*.zip

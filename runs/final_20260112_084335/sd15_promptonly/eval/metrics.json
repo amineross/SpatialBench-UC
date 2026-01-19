@@ -1,0 +1,64 @@
+{
+  "total_samples": 800,
+  "pass_count": 94,
+  "fail_count": 96,
+  "undecidable_count": 610,
+  "coverage": 0.2375,
+  "pass_rate_overall": 0.1175,
+  "pass_rate_conditional": 0.49473684210526314,
+  "undecidable_rate": 0.7625,
+  "mean_confidence": 0.2058981726219487,
+  "by_relation": {
+    "left_of": {
+      "count": 200,
+      "pass_count": 15,
+      "fail_count": 19,
+      "undecidable_count": 166,
+      "coverage": 0.17,
+      "pass_rate_overall": 0.075,
+      "pass_rate_conditional": 0.4411764705882353
+    },
+    "right_of": {
+      "count": 200,
+      "pass_count": 18,
+      "fail_count": 21,
+      "undecidable_count": 161,
+      "coverage": 0.195,
+      "pass_rate_overall": 0.09,
+      "pass_rate_conditional": 0.46153846153846156
+    },
+    "above": {
+      "count": 200,
+      "pass_count": 33,
+      "fail_count": 28,
+      "undecidable_count": 139,
+      "coverage": 0.305,
+      "pass_rate_overall": 0.165,
+      "pass_rate_conditional": 0.5409836065573771
+    },
+    "below": {
+      "count": 200,
+      "pass_count": 28,
+      "fail_count": 28,
+      "undecidable_count": 144,
+      "coverage": 0.28,
+      "pass_rate_overall": 0.14,
+      "pass_rate_conditional": 0.5
+    }
+  },
+  "undecidable_reasons": {
+    "ambiguous": 73,
+    "missing": 448,
+    "near_boundary": 87,
+    "high_overlap": 2
+  },
+  "timestamp_utc": "2026-01-16T11:38:51.922505+00:00",
+  "manifest": "runs/final_20260112_084335/sd15_promptonly/manifest.jsonl",
+  "config": "configs/checker_v1.yaml",
+  "code_version": {
+    "torch": "2.9.1+cu128",
+    "torchvision": "0.24.1+cu128",
+    "transformers": "4.57.3",
+    "git_commit": "586dbf59"
+  }
+}

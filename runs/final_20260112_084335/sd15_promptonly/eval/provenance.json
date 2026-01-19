@@ -1,0 +1,22 @@
+{
+  "timestamp_utc": "2026-01-16T11:38:51.986506+00:00",
+  "python_version": "3.11.10 (main, Sep  7 2024, 18:35:41) [GCC 11.4.0]",
+  "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.35",
+  "device_info": {
+    "device": "cuda",
+    "cuda_available": true,
+    "mps_available": false,
+    "torch_version": "2.9.1+cu128",
+    "cuda_device_name": "NVIDIA GeForce RTX 4090",
+    "cuda_device_count": 1,
+    "cuda_memory_gb": 23.53,
+    "cuda_capability": "8.9"
+  },
+  "git_commit": "586dbf599cc2e705b4deda535745f5a98b3f0895",
+  "library_versions": {
+    "torch": "2.9.1+cu128",
+    "torchvision": "0.24.1+cu128",
+    "transformers": "4.57.3",
+    "git_commit": "586dbf59"
+  }
+}
