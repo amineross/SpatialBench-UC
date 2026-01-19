@@ -109,6 +109,18 @@ python -m spatialbench_uc.report \
 
 If you use this benchmark, please cite:
 
-TODO
+```bibtex
+@article{rostane2026spatialbench,
+  title={SpatialBench-UC: Uncertainty-Aware Evaluation of Spatial Prompt Following in Text-to-Image Generation},
+  author={Amine Rostane},
+  journal={arXiv preprint},
+  year={2026},
+  url={PENDING}
+}
+```
+
+**arXiv:** PENDING
 
 ## License
+
+This work is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
