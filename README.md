@@ -1,6 +1,11 @@
 <img src="assets/banner.png" alt="SpatialBench-UC banner" width="100%"/>
 <br/>
 # SpatialBench-UC
+<p align="center">
+  <a href="https://arxiv.org/abs/2601.13462">
+    <img src="https://img.shields.io/badge/arXiv-2601.13462-b31b1b.svg">
+  </a>
+</p>
 
 **SpatialBench-UC** is a benchmark and evaluation toolkit for **pairwise spatial relations** in text-to-image generation, with explicit **abstention and uncertainty modeling**.
 
@@ -15,6 +20,7 @@ Spatial verification via object detection + geometry is often ambiguous (missing
 | **Reporting** | Tables and plots from per-sample outputs | `src/spatialbench_uc/report.py` |
 | **Audit utilities** | Risk-coverage analysis on human-labeled subset | `src/spatialbench_uc/audit/` |
 | **Frozen run bundle** | Paper results (no image regeneration needed) | `runs/final_20260112_084335/` |
+| **Full dataset (images + overlays)** | All generated images and evaluation overlays | [Hugging Face](https://huggingface.co/datasets/aminerostane/spatialbench-uc) |
 
 ## Installation
 
@@ -44,6 +50,8 @@ pip install -r requirements/torch-cpu.txt && pip install -e .
 ## Reproducing paper results
 
 The frozen run bundle contains all per-sample outputs needed to reproduce paper tables **without regenerating images**.
+
+> **Full images and overlays** are available on Hugging Face: [aminerostane/spatialbench-uc](https://huggingface.co/datasets/aminerostane/spatialbench-uc)
 
 ```
 runs/final_20260112_084335/
