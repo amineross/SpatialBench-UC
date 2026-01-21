@@ -1,6 +1,8 @@
 <img src="assets/banner.png" alt="SpatialBench-UC banner" width="100%"/>
 <br/>
+
 # SpatialBench-UC
+
 <p align="center">
   <a href="https://arxiv.org/abs/2601.13462">
     <img src="https://img.shields.io/badge/arXiv-2601.13462-b31b1b.svg">
