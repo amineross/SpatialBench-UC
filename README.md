@@ -1,3 +1,5 @@
+<img src="assets/banner.png" alt="SpatialBench-UC banner" width="100%"/>
+<br/>
 # SpatialBench-UC
 
 **SpatialBench-UC** is a benchmark and evaluation toolkit for **pairwise spatial relations** in text-to-image generation, with explicit **abstention and uncertainty modeling**.
