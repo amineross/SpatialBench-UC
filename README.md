@@ -110,16 +110,14 @@ python -m spatialbench_uc.report \
 If you use this benchmark, please cite:
 
 ```bibtex
-@article{rostane2026spatialbenchuc,
-  title        = {SpatialBench-UC: Uncertainty-Aware Evaluation of Spatial Prompt Following in Text-to-Image Generation},
-  author       = {Rostane, Amine},
-  journal      = {arXiv preprint arXiv:2601.13462},
-  year         = {2026},
-  url          = {https://arxiv.org/abs/2601.13462},
-  doi          = {10.48550/arXiv.2601.13462},
-  eprint       = {2601.13462},
-  archivePrefix= {arXiv},
-  primaryClass = {cs.AI}
+@misc{rostane2026spatialbenchucuncertaintyawareevaluationspatial,
+      title={SpatialBench-UC: Uncertainty-Aware Evaluation of Spatial Prompt Following in Text-to-Image Generation}, 
+      author={Amine Rostane},
+      year={2026},
+      eprint={2601.13462},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2601.13462}, 
 }
 ```
 
